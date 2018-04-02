@@ -8,6 +8,7 @@ import csv
 
 from kelpy.CommandableImageSprite import *
 from kelpy.TextSprite import *
+from kelpy.DotStimulus import *
 
 from kelpy.Miscellaneous import *
 from kelpy.DisplayQueue import *
@@ -27,8 +28,10 @@ use_tobii_sim = True #toggles between using the tobii simulator or the actual to
 min_dots = 10
 max_dots = 80
 trials_per_time = 10
-times = [0.25, 1.0, 4.0, 8.0]
+times = [0.25, 1.0, 4.0]
 iti = 1 #number of seconds to wait between each trial
+dot_radius = random.randint(5,10)
+
 file_header = ['Subject', 'Session', 'Trial','Time', 'Trial_Start', 'Trial_End', 
 		'Dots_Shown', 'Dots_Counted','Score', 'Dot_Width',
 			 'Dot_Height', 'dl_x', 'dl_y']
@@ -48,6 +51,7 @@ IMAGE_SCALE = 0.1
 
 #screen, spot= initialize_kelpy( dimensions=(800,600) )
 screen, spot = initialize_kelpy( fullscreen=True )
+middle = (screen.get_width()/2, screen.get_height()/2)
 
 
 ##############################################
@@ -75,34 +79,15 @@ else:
 
 use_tobii_sim = False
 
-max_x = int(math.ceil(math.sqrt(max_dots))+1)
-max_y = int(math.ceil(math.sqrt(max_dots))+1)
-middle = (screen.get_width()/2, screen.get_height()/2)
 
-grid = []
-for i in range(0,max_x):
-	for j in range(0,max_y):
-
-		#determine location on screen
-		unit_x = (screen.get_width()/(max_x + 1))
-		unit_y = (screen.get_height()/(max_y + 1))
-
-
-
-		loc_x = unit_x * (i+1)
-		loc_y = unit_y * (j+1)
-
-		loc_x = loc_x + unit_x * (random.random() - 0.5) * 0.5
-		loc_y = loc_y + unit_y * (random.random() - 0.5) * 0.5
-
-		loc = (loc_x, loc_y)
-		grid.append(loc)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Run a single trial
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
 
-
+static_im = DotStimulus(screen, middle, N=500, pad=0, 
+			radius=1., circled=False, height=screen.get_height(), 
+				width=screen.get_width(), dot_color=(0,0,0))
 
 
 
@@ -116,32 +101,15 @@ def present_trial(num_dots, max_time = 1):
 	#image for dots
 	dot_image = kstimulus('shapes/circle_red.png')
 	blank_image = kstimulus('misc/blankbox.png')
-
-	#selected_image = kstimulus('decorators/circle_solid_red.png')
-
-
-	#stores all the dot sprites
-	dots = []
-	#blanks = []
-	#also store the locations (for output later)
-	dot_locations = []
-	random.shuffle(grid)
+	static_image = kstimulus('misc/static.png')
 
 
-	#create X amount of sprites depending on the trial
-
-
-	#random.shuffle(poss_dot_locations)
-	dot_locations = grid[:num_dots]
-	#dot_locations = grid
-
-	for loc in dot_locations:
-		#create sprite
-		dots.append(TobiiSprite( screen, loc, dot_image, 
-			tobii_controller, scale=IMAGE_SCALE))
-		#blanks.append(TobiiSprite( screen, loc, blank_image, 
-			#tobii_controller, scale=2))
+	dots = DotStimulus(screen, middle, N=num_dots, circled=False,radius=dot_radius,
+				 dot_color=(255,0,0), height=screen.get_height()*0.9, 
+					width=screen.get_width()*0.9)
 	
+	dot_locations = dots.dot_positions
+
 	# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 	# Set up the updates, etc. 
 	
@@ -157,100 +125,21 @@ def present_trial(num_dots, max_time = 1):
 		# start recording the "eye gaze" data
 		tobii_controller.start_tracking()		
 
-	#stores the number for what the partipant says they counted
-	reported_number = '';
-
-
-	#while (time_elapsed < max_time):
-		#pass
-	blanked = False
-
-
 	for event in kelpy_standard_event_loop(screen, Q, dos,
 								 throw_null_events=True):
 
-
-
 		time_elapsed = time() - trial_start
-		if time_elapsed - max_time > 0 and not blanked:
-				#get the end time
+		if time_elapsed - max_time > 0:
 			trial_end = time()
 
-			blank_im = TobiiSprite(screen,middle,blank_image, tobii_controller,
-					scale=10.)
-
-			dos.append(blank_im)
-			blanked=True
-			request = TextSprite("Guess the number of dots:",screen, middle)
-			dos.append(request)
 			if not use_tobii_sim:				
 				#stop collecting "eye gaze" data
 				tobii_controller.stop_tracking()
 
-			#for dot in dots:
-			#Q.append(obj=dot, action='scale', amount=0.0, duration=0.0)
+			break
 
-			#dos = OrderedUpdates(dots) 
-
-
-
-		# for i in range(num_dots):
-		# 	if dots[i].is_looked_at():
-
-		# 		#can check if the dot is being looked at by changing its color (only for debugging, will not actually be used)
-		#  		#Q.append(obj=dots[i], action='swap', image=selected_image, rotation=0, scale=IMAGE_SCALE) 
-
-		# 		#the timing doesn't seem to line up with the tobii time, so going to comment this out for now,
-		# 		#and do these calculations post-task via a script (11.02.16)
-		# 		if not use_tobii_sim:
-		# 			#can record event about which dot was looked at and pass it to tobii data output
-		# 			tobii_controller.record_event(i+1)
-					
-
-		#wait until a number is given and Enter is pressed
-		#?: should the delete key be added?
 
 		if event.type == KEYDOWN:
-			if blanked:
-				prev_num = reported_number
-				if event.key == K_0 or event.key == K_KP0:
-					reported_number += '0';
-				elif event.key == K_1 or event.key == K_KP1:
-					reported_number += '1';
-				elif event.key == K_2 or event.key == K_KP2:
-					reported_number += '2';
-				elif event.key == K_3 or event.key == K_KP3:
-					reported_number += '3';
-				elif event.key == K_4 or event.key == K_KP4:
-					reported_number += '4';
-				elif event.key == K_5 or event.key == K_KP5:
-					reported_number += '5';
-				elif event.key == K_6 or event.key == K_KP6:
-					reported_number += '6';
-				elif event.key == K_7 or event.key == K_KP7:
-					reported_number += '7';
-				elif event.key == K_8 or event.key == K_KP8:
-					reported_number += '8';
-				elif event.key == K_9 or event.key == K_KP9:
-					reported_number += '9';
-				elif event.key == K_BACKSPACE:
-					reported_number = reported_number[:-1]
-				elif (event.key == K_RETURN or
-				 	event.key == K_KP_ENTER or (len(reported_number) >= 3)):
-					if reported_number:
-						#get the end time
-						sleep(0.5)	
-
-						clear_screen(screen) #function defined in Miscellaneous
-
-						return trial_start, trial_end, int(reported_number), dots[0].get_width(), dots[0].get_height(), dot_locations
-				
-				if reported_number != prev_num:
-					placement = (screen.get_width()/2, screen.get_height()*0.65)
-					dos.append(TobiiSprite(screen,placement,blank_image, tobii_controller,
-							scale=0.25 * len(reported_number)))
-					dos.append(TextSprite(reported_number,screen, placement))
-
 
 			#need to do a check for exiting here
 			if event.key == K_ESCAPE:
@@ -263,8 +152,77 @@ def present_trial(num_dots, max_time = 1):
 
 
 
+	clear_screen(screen)
+	request = TextSprite("Guess the number of red dots you saw:",screen, middle)
+	dos = OrderedUpdates([static_im, request])
+
+	reported_number = '';
+	prev_num = '';
+
+	for event in kelpy_standard_event_loop(screen, Q, dos,
+							 throw_null_events=False):
+		time_elapsed = time() - trial_start
+		if event.type == KEYDOWN:
+			if event.key == K_ESCAPE:
+				#make sure to close the data file when exiting, otherwise it'll hang
+				if not use_tobii_sim:
+					tobii_controller.stop_tracking()
+					tobii_controller.close_data_file()
+					tobii_controller.destroy()
+
+			elif event.key == K_0 or event.key == K_KP0:
+				reported_number += '0';
+			elif event.key == K_1 or event.key == K_KP1:
+				reported_number += '1';
+			elif event.key == K_2 or event.key == K_KP2:
+				reported_number += '2';
+			elif event.key == K_3 or event.key == K_KP3:
+				reported_number += '3';
+			elif event.key == K_4 or event.key == K_KP4:
+				reported_number += '4';
+			elif event.key == K_5 or event.key == K_KP5:
+				reported_number += '5';
+			elif event.key == K_6 or event.key == K_KP6:
+				reported_number += '6';
+			elif event.key == K_7 or event.key == K_KP7:
+				reported_number += '7';
+			elif event.key == K_8 or event.key == K_KP8:
+				reported_number += '8';
+			elif event.key == K_9 or event.key == K_KP9:
+				reported_number += '9';
+			elif event.key == K_BACKSPACE:
+				reported_number = reported_number[:-1]
+			elif (event.key == K_RETURN or
+			 	(event.key == K_KP_ENTER)):
+				if reported_number:
+					#get the end time
+
+					clear_screen(screen) #function defined in Miscellaneous
+
+					return (trial_start, trial_end, int(reported_number),
+							 dot_radius, dot_radius, dot_locations)
+			
+			if len(reported_number) > 3:
+				reported_number = reported_number[:-1]
+			if reported_number != prev_num:
+
+				#dos.append(TextSprite(reported_number,screen, placement))
+
+				if len(reported_number) < len(prev_num):
+					placement = ((1 + 0.025 * (len(prev_num)-2)) * screen.get_width()/2, 
+								screen.get_height()*0.55)
+					dos.append(TobiiSprite(screen,placement,blank_image, tobii_controller,
+							scale=0.1))
+				else:
+					placement = ((1 + 0.025 * (len(reported_number)-2)) * screen.get_width()/2, 
+								screen.get_height()*0.55)
+					dos.append(TextSprite(reported_number[-1],screen, placement))
+
+				prev_num = reported_number
+
+
 def present_score(score=0, t=1):
-	score_text = "Your average accuracy: %0.2f" % score
+	score_text = "Your average accuracy this round: %0.2f" % score
 	dos = OrderedUpdates([TextSprite(score_text, screen, middle)])
 	Q = DisplayQueue()
 	start_t = time()
@@ -286,7 +244,82 @@ def present_score(score=0, t=1):
 
 
 
-	
+def present_instructions(n):
+	texts = []
+	texts.append("This experiment will consist of %d rounds with %d trials in each. " % (len(times), n))
+	texts.append("In each trial, a number of dots will appear on the screen, ")
+	texts.append("and your job will be to estimate how many you saw. ")
+	texts.append("You will get a bonus payment proportional to your overall accuracy. ")
+
+	texts.append("The amount of time you have to estimate will vary between rounds. ")
+	texts.append("Press enter to continue. ")
+
+
+	text_sprites = []
+	for i in xrange(len(texts)):
+		text = texts[i]
+		text_sprites.append(TextSprite(text, screen, (middle[0], middle[1] +
+				 (i - len(texts)/2) * 0.075*screen.get_height()/2)))
+
+
+	dos = OrderedUpdates(text_sprites)
+
+	Q = DisplayQueue()
+	for event in kelpy_standard_event_loop(screen, Q, dos,
+				throw_null_events=True):
+
+
+		if event.type == KEYDOWN:
+			#need to do a check for exiting here
+			if event.key == K_ESCAPE:
+				#make sure to close the data file when exiting, otherwise it'll hang
+				if not use_tobii_sim:
+					tobii_controller.close_data_file()
+					tobii_controller.destroy()
+
+			elif (event.key == K_RETURN or
+					 	event.key == K_KP_ENTER):
+				clear_screen(screen)
+				return
+
+
+
+
+def round_update(t, n, which_round):
+
+	texts = []
+
+	texts.append("In this round, you will have %0.2f seconds to estimate on each trial." % t)
+	texts.append("There are %d trials in the round. " % n)
+	texts.append("Press enter to start.")
+
+
+	text_sprites = []
+	for i in xrange(len(texts)):
+		text = texts[i]
+		text_sprites.append(TextSprite(text, screen, (middle[0], middle[1] +
+				 (i - len(texts)/2) * 0.075*screen.get_height()/2)))
+
+
+	dos = OrderedUpdates(text_sprites)
+
+	Q = DisplayQueue()
+	for event in kelpy_standard_event_loop(screen, Q, dos,
+				throw_null_events=True):
+
+
+		if event.type == KEYDOWN:
+			#need to do a check for exiting here
+			if event.key == K_ESCAPE:
+				#make sure to close the data file when exiting, otherwise it'll hang
+				if not use_tobii_sim:
+					tobii_controller.close_data_file()
+					tobii_controller.destroy()
+
+			elif (event.key == K_RETURN or
+					 	event.key == K_KP_ENTER):
+				clear_screen(screen)
+				return
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Main experiment
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
@@ -322,22 +355,31 @@ with open(data_file, 'wb') as df:
 	#present the 10 trials
 	trial = 0
 	score = 0.
+	present_instructions(trials_per_time)
+
 	for t in xrange(len(times)):
 		time_ind = times[t]
+		round_update(time_ind, len(trials_dots[t]), t)
+		round_score = 0
 		for trial in range(len(trials_dots[t])):
 			sleep(iti) #wait before presenting next trial
 
 			trial_start, trial_end, num_counted, dot_width, dot_height, dot_locations = present_trial(trials_dots[t][trial], time_ind)
 
-			score +=  (1 - max(0,abs(num_counted - len(dot_locations))/float(len(dot_locations))))
+
+			trial_score = (1 - min(1,abs(num_counted - len(dot_locations))/float(len(dot_locations))))
+			print len(dot_locations), num_counted, trial_score
+
+			score +=  trial_score
+			round_score += trial_score
 			#output trial info to csv
 			for dl in dot_locations:
 				dl1 = dl[0]
 				dl2 = dl[1]
 				writer.writerow([subject, session, trial,time_ind, trial_start, trial_end, 
-					trials_dots[t][trial], num_counted, score, dot_width, dot_height, dl1, dl2])
+					trials_dots[t][trial], num_counted, trial_score, dot_width, dot_height, dl1, dl2])
 
-			present_score(score/float(t*len(trials_dots[t])+trial+1))
+			present_score(round_score / float(trial + 1))
 
 			#print out the number of dots shown and the number counted (for debugging)
 			#print 'dots shown: ' + str(trial_dots[trial]) + ', dots counted: ' + str(num_counted)

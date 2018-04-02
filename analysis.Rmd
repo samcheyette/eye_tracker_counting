@@ -1,0 +1,81 @@
+
+
+---
+output:
+  pdf_document:
+    fig_caption: yes
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.width=5, fig.height=5,fig.align = "center",cache=TRUE)
+```
+
+
+
+```{r, echo=FALSE, include=FALSE, warning=FALSE, message=FALSE}
+##libraries, globals
+
+library(ggplot2)
+library(reshape)
+library(grid)
+library(dplyr)
+library(gridExtra)
+paper_theme <- theme(#legend.title=element_text( size = 14, face="plain"), 
+                     legend.text=element_text(size = 12),
+                     legend.title=element_blank(),
+                     #legend.text=element_blank(),
+
+                     axis.title.x = element_text(size=0),
+                     axis.text.x=element_text(colour="black", size = 12), 
+                     axis.title.y = element_text(size = 14, vjust = 1),
+                     axis.text.y  = element_text(size = 12),
+                     panel.grid.major = element_blank(), 
+                     panel.grid.minor = element_blank(), 
+                     panel.background = element_blank(),
+                     axis.line.x = element_line(colour = "black"), 
+                     axis.line.y = element_line(colour = "black"))
+
+
+binomial_smooth <- function(...) {
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), ...)
+}
+```
+
+
+```{r}
+
+data <- read.csv("data/d1.csv", sep="\t")
+data$id <- seq.int(1, nrow(data))
+
+data.resp <- data %>%
+            group_by(Trial, Time) %>%
+            top_n(n=1, wt=id) %>%
+            group_by(Dots_Counted, Dots_Shown) %>%
+            mutate(err=Dots_Counted - Dots_Shown) %>%
+            mutate(abs_err = abs(err)) %>%
+            mutate(over = 1*(Dots_Counted > Dots_Shown)) %>%
+            mutate(under = 1*(Dots_Shown > Dots_Counted)) %>%
+            mutate(corr= 1*(Dots_Counted == Dots_Shown))
+
+
+
+```
+
+```{r}
+p.1 <- ggplot(data=data.resp) +
+      geom_point(aes(x=Dots_Shown, y=err, color=factor(Time)))
+
+p.2 <- ggplot(data=data.resp) +
+      stat_summary(aes(x=factor(Time), y=err), fun.data="mean_cl_boot")
+
+p.3 <- ggplot(data=data.resp) +
+      stat_summary(aes(x=factor(Time), y=over), fun.data="mean_cl_boot")
+
+p.4 <- ggplot(data=subset(data.resp, data.resp$corr == 0)) +
+      binomial_smooth(aes(x=Dots_Shown, y=over, color=factor(Time)), se=FALSE)
+
+
+
+```
