@@ -28,9 +28,9 @@ use_tobii_sim = True #toggles between using the tobii simulator or the actual to
 min_dots = 10
 max_dots = 80
 trials_per_time = 10
-times = [0.25, 1.0, 4.0]
+times = [1.0, 5.0]
 iti = 1 #number of seconds to wait between each trial
-dot_radius = random.randint(5,10)
+dot_radius = 10
 
 file_header = ['Subject', 'Session', 'Trial','Time', 'Trial_Start', 'Trial_End', 
 		'Dots_Shown', 'Dots_Counted','Score', 'Dot_Width',
@@ -347,7 +347,7 @@ pygame.mouse.set_visible(False)
 with open(data_file, 'wb') as df:
 
 	#create csv writer (using tabs as the delimiter; the "tsv" extension is being used for the tobii output)
-	writer = csv.writer(df, delimiter= '\t')
+	writer = csv.writer(df, delimiter= ',')
 
 	#write the header for the file
 	writer.writerow(file_header)
