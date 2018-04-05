@@ -22,6 +22,7 @@ library(reshape)
 library(grid)
 library(dplyr)
 library(gridExtra)
+library(lme4)
 paper_theme <- theme(#legend.title=element_text( size = 14, face="plain"), 
                      legend.text=element_text(size = 12),
                      legend.title=element_blank(),
@@ -46,7 +47,7 @@ binomial_smooth <- function(...) {
 
 ```{r, include=FALSE}
 
-data.resp.loc <- read.csv("data/response_data.csv", sep="\t")
+data.resp.loc <- read.csv("data/dot_gaze.csv", sep="\t")
 data.tracker <- read.csv("data/tracker_data.csv", sep="\t")
 data.tracker$trial_id <- data.tracker$trial_id - 1
 data.resp.loc$trial_id <- data.resp.loc$trial_id - 1
@@ -55,9 +56,9 @@ data.resp.loc$id <- seq.int(1, nrow(data.resp.loc))
 
 
 data.resp <- data.resp.loc %>%
-            group_by(Trial, Time) %>%
+            group_by(Trial, Time, pid) %>%
             top_n(n=1, wt=id) %>%
-            group_by(Dots_Counted, Dots_Shown) %>%
+            group_by(Dots_Counted, Dots_Shown, pid) %>%
             mutate(err=Dots_Counted - Dots_Shown) %>%
             mutate(abs_err = abs(err)) %>%
             mutate(over = 1*(Dots_Counted > Dots_Shown)) %>%
@@ -66,44 +67,138 @@ data.resp <- data.resp.loc %>%
 
 
 data.tracker <- data.tracker %>%
+                  filter(ValidityLeft == 0 & ValidityRight == 0) %>%
+
                 mutate(av_x = (GazePointXLeft +GazePointXRight)/2) %>%
                 mutate(av_y = (GazePointYLeft +GazePointYRight)/2) %>%
                 group_by(trial_id) %>%
-                mutate(Time = round(max(TimeStamp)/1000))
+                mutate(Time = round(max(TimeStamp)/100)/10)
 
+data.tracker$id <- seq.int(1,nrow(data.tracker))
+
+
+
+
+```
+
+
+```{r}
+
+
+p.1 <- ggplot() +
+          geom_point(data=data.resp.loc, aes(x=dl_x, y=dl_y, color=gazeDist), size=0.1, alpha=0.6) + 
+
+          facet_wrap(~trial_id) +
+          coord_cartesian(xlim=c(0,1800), ylim=c(0,1000)) +
+          scale_color_gradient2(low="Blue", mid="Red",  high="Yellow",midpoint=1000)  
+
+
+```
+
+```{r, fig.width=10, fig.height=5, results='asis'}
+
+  data.resp.avs <- data.resp.loc %>%
+                  filter(gazeDist > 0 & Dots_Shown < 100) %>%
+                  mutate(err=Dots_Counted - Dots_Shown) %>%
+                  mutate(abs_err = abs(err)) %>%
+                  mutate(within_50 = gazeDist < 50) %>%
+                  group_by(trial_id) %>%
+                  mutate(within_50 = sum(within_50)) %>
+                  mutate(mean_dist=median(gazeDist)) %>%
+                  mutate(mean_abs_err = mean(abs_err)) %>%
+                  mutate(pct_err=mean_abs_err/Dots_Shown) %>%
+                  top_n(n=1, wt=id) %>% 
+                  filter(mean_dist < 600)
+
+
+ggplot(data.resp.avs, aes(x=mean_dist, y=pct_err)) +
+        #geom_point() +
+        geom_point(aes(color=factor(Time))) +
+        stat_smooth(method="lm", aes(color=factor(Time)), se=FALSE) +
+        facet_wrap(~pid) +
+        xlab("Median Distance from Dot") +
+        ylab("")
+        
+
+ggplot(data.resp.avs, aes(x=factor(pid), y=mean_dist)) +
+      stat_summary(fun.data="mean_cl_boot")
+    
+
+ggplot(data.resp.avs, aes(x=factor(pid), y=pct_err)) +
+      stat_summary(fun.data="mean_cl_boot")
+    
+
+    
 
 ```
 
 ```{r, message=FALSE, echo=FALSE}
-p.1 <- ggplot(data=data.resp) +
-      geom_point(aes(x=Dots_Shown, y=err, color=factor(Time)))
 
-p.2 <- ggplot(data=data.resp) +
+
+few_dot <- subset(data.resp, data.resp$Dots_Shown < 75)
+
+
+p.1 <- ggplot(data=few_dot) +
+      geom_jitter(aes(x=Dots_Shown, y=err, color=factor(Time)), width=0.5, height=0.5)
+
+p.2 <- ggplot(data=few_dot) +
       stat_summary(aes(x=factor(Time), y=err), fun.data="mean_cl_boot")
 
-p.3 <- ggplot(data=data.resp) +
+p.2.1 <- ggplot(data=few_dot) +
+      stat_summary(aes(x=factor(Time), y=abs_err), fun.data="mean_cl_boot")
+
+p.3 <- ggplot(data=few_dot) +
       stat_summary(aes(x=factor(Time), y=over), fun.data="mean_cl_boot")
 
-p.4 <- ggplot(data=subset(data.resp, data.resp$corr == 0), aes(x=Dots_Shown,   y=over, color=factor(Time))) +
-      binomial_smooth(se=FALSE) +
-       geom_jitter(width=1, height=0.1)
+p.4 <- ggplot(data=subset(few_dot, few_dot$corr == 0), aes(x=Dots_Shown,   y=over, color=factor(Time))) +
+      binomial_smooth(se=FALSE) + 
+       ylab("P(over-estimate)")#+
+       #geom_jitter(width=1, height=0.1)
+
+p.5 <- ggplot(data=few_dot) +
+      geom_jitter(aes(x=Dots_Shown, y=abs_err, color=factor(Time)), width=0.5, height=0.5) +
+      stat_smooth(aes(x=Dots_Shown, y=abs_err, color=factor(Time)), method="loess", se=FALSE) 
 
 
+
+p.6 <- ggplot(data=few_dot, aes(x=Dots_Shown, y=Dots_Counted)) +
+        geom_jitter(aes(color=Time), alpha=0.7, width=1, height=1) +
+        geom_abline() +
+        coord_cartesian(xlim=c(0,max(few_dot$Dots_Shown)), ylim=c(0,max(few_dot$Dots_Shown))) +
+  
+        scale_color_gradient2(low="Black", mid="Blue",  high="Red",midpoint=0.2)   +
+        paper_theme
+
+
+p.1
+p.2
+p.2.1
+p.3
+p.4
+p.5
+p.6
 
 ```
 
 
-```{r, fig.width=10,fig.height=10}
+```{r, fig.width=14,fig.height=14}
 
 
-ggplot(data=subset(data.tracker, data.tracker$Time==1), aes(x=av_x, y=av_y)) +
+ggplot(data=subset(data.tracker, data.tracker$Time==.1), aes(x=av_x, y=av_y)) +
           geom_point(aes(color=TimeStamp)) +
           facet_wrap(~trial_id) +
    scale_color_gradient2(low="Blue", mid="Red",  high="Yellow",midpoint=250)  +
         ggtitle("Eye-movements, 1 second")
 
 
-ggplot(data=subset(data.tracker, data.tracker$Time == 5), aes(x=av_x, y=av_y)) +
+ggplot(data=subset(data.tracker, data.tracker$Time == .5), aes(x=av_x, y=av_y)) +
+          geom_point(aes(color=TimeStamp)) +
+          facet_wrap(~trial_id) + 
+        scale_color_gradient2(low="Blue", mid="Red",  high="Yellow",midpoint=1000)  +
+          ggtitle("Eye-movements, 5 seconds")
+
+
+ggplot(data=subset(data.tracker, data.tracker$Time == 2.5), aes(x=av_x, y=av_y)) +
           geom_point(aes(color=TimeStamp)) +
           facet_wrap(~trial_id) + 
         scale_color_gradient2(low="Blue", mid="Red",  high="Yellow",midpoint=1000)  +
@@ -111,60 +206,31 @@ ggplot(data=subset(data.tracker, data.tracker$Time == 5), aes(x=av_x, y=av_y)) +
 
 
 
+subs <- subset(data.tracker, data.tracker$id %% 5  == 0)
+subs <- subs %>%
+      
+      
+        mutate(av_x = 100 * round(av_x/100)) %>%
+          mutate(av_y = 100 * round(av_y/100))  %>%
+          filter()
 
 ggplot() +
-          geom_point(data=data.resp.loc, aes(x=dl_x, y=dl_y)) +
-
-          stat_density_2d(data=data.tracker, aes(x=av_x, y=av_y, color=factor(Time)), n=20, 
-                          contour=TRUE) +
-          facet_wrap(~Time~trial_id)  +
-            coord_cartesian(xlim=c(0,1800), ylim=c(0,1000)) 
-
-
-
-
-none <- ggplot() +
-          geom_point(data=data.resp.loc, aes(x=dl_x, y=dl_y), size=0.25) +
+          #geom_point(data=subs, aes(x=dl_x, y=dl_y), size=0.25) +
 
           geom_path(data=data.tracker, aes(x=av_x, y=av_y, color=TimeStamp), alpha=0.9) +
-          facet_wrap(~Time~trial_id) +
-          coord_cartesian(xlim=c(0,1000), ylim=c(0,1000))
-
-
-
-
-
-ggplot() +
-
-          #geom_path(data=subset(data.tracker, data.tracker$trial_id %% 20 > 10), aes(x=av_x, y=av_y, color=TimeStamp), alpha=0.9) +
-          stat_density_2d(data=subset(data.tracker,data.tracker$Time == 1), n=20,  aes(x=av_x, y=av_y),alpha=0.8,
-                          contour=TRUE) +
-          geom_point(data=subset(data.resp.loc, data.resp.loc$Time == 1), aes(x=dl_x, y=dl_y), size=0.9) +
+          geom_point(data=data.resp.loc, aes(x=dl_x, y=dl_y), size=0.1, alpha=0.6) + 
 
           facet_wrap(~trial_id) +
           coord_cartesian(xlim=c(0,1800), ylim=c(0,1000)) +
-          paper_theme +
-            ggtitle("Eye-movements v. dot loc, 1 seconds")
+          scale_color_gradient2(low="Blue", mid="Red",  high="Yellow",midpoint=1000)  
+
+ggsave("figs/pilot_eye_moves.png", width=15, height=15)
 
 
 
-ggplot() +
 
-          #geom_path(data=subset(data.tracker, data.tracker$trial_id %% 20 > 10), aes(x=av_x, y=av_y, color=TimeStamp), alpha=0.9) +
-          stat_density_2d(data=subset(data.tracker, data.tracker$Time == 5), n=20,  aes(x=av_x, y=av_y),alpha=0.8,
-                          contour=TRUE) +
-          geom_point(data=subset(data.resp.loc, data.resp.loc$tTime == 5), aes(x=dl_x, y=dl_y), size=0.9) +
 
-          facet_wrap(~trial_id) +
-          coord_cartesian(xlim=c(0,1800), ylim=c(0,1000)) +
-          paper_theme +
-          ggtitle("Eye-movements v. dot loc, 5 seconds")
 
 ```
 
-```{r}
-p.1 
-p.2 
-p.3
-p.4
-```
+
