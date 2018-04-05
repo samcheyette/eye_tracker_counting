@@ -34,9 +34,11 @@ def get_min_gaze(gaze_points, dot, cutoff=100):
 	n_below_x = 0
 	for g in gaze_points:
 		dist = get_gaze_distance(g, dot)
+
 		if min_dist == -1 or dist < min_dist:
 			min_dist = dist
 			which_gaze = g
+
 		if dist < cutoff:
 			n_below_x += 1
 
@@ -50,7 +52,6 @@ def main():
 	response_data = get_dot_data("data/response_data.csv")
 	
 	trials = pd.unique(response_data["trial_id"])
-	grouped_track = tracker_data.groupby("trial_id")
 
 	new_resp_data = copy.deepcopy(response_data)
 	new_resp_data["gazeX"] = None
@@ -59,29 +60,28 @@ def main():
 	new_resp_data["belowX"] = None
 
 	z = 0
-	for t in trials:
+
+	for z,row in response_data.iterrows():
+		t = row["trial_id"]
+
 		td = tracker_data[tracker_data["trial_id"] == t]
-		rd = response_data[response_data["trial_id"] == t]
 
 		gaze = zip(td["GazePointX"], td["GazePoint"])
-		points = zip(rd["dl_x"], rd["dl_y"])
-		ps = []
-		for p in points:
-			min_gaze = get_min_gaze(gaze, p, cutoff=500)
-			dist = min_gaze[0]
-			gaze_x = min_gaze[1][0]
-			gaze_y = min_gaze[1][1]
-			n_below_x = min_gaze[2]
-			#new_resp_data[new_resp_data["trial_id" == t]]
+		p = row["dl_x"], row["dl_y"]	
+		
+		min_gaze = get_min_gaze(gaze, p, cutoff=500)
+		dist = min_gaze[0]		
+		gaze_x = min_gaze[1][0]
+		gaze_y = min_gaze[1][1]
+		n_below_x = min_gaze[2]
 
-			new_resp_data.at[z, 'gazeDist'] = dist
-			new_resp_data.at[z, 'gazeX'] = gaze_x
-			new_resp_data.at[z, 'gazeY'] = gaze_y
-			new_resp_data.at[z, 'belowX'] = n_below_x
-
-			z += 1
+		new_resp_data.at[z, 'gazeDist'] = dist
+		new_resp_data.at[z, 'gazeX'] = gaze_x
+		new_resp_data.at[z, 'gazeY'] = gaze_y
+		new_resp_data.at[z, 'belowX'] = n_below_x
 
 	new_resp_data.to_csv("data/dot_gaze.csv", sep="\t")
+
 
 
 if __name__ == "__main__":
