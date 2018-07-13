@@ -1,6 +1,30 @@
 import copy
 import csv
 import pandas as pd  
+import time 
+import itertools as it
+
+
+def make_grid(n_grid, grid_size_x, grid_size_y, left_x, down_y):
+
+	grid_x =  [(left_x + i*grid_size_x) for i in xrange(n_grid)]
+	grid_y =  [(down_y + i*grid_size_y) for i in xrange(n_grid)]
+	grid = list(it.product(grid_x,grid_y))
+
+	return grid
+
+
+
+def get_grid_in_gaze(grid, gaze_points, radius):
+	in_gaze = set()
+	for grd in grid:
+		for gp in gaze_points:
+			x_diff = float(gp[0]) - float(grd[0])
+			y_diff = float(gp[1]) - float(grd[1])
+			diff = (x_diff**2 + y_diff**2)**0.5
+			if diff < radius:
+				in_gaze.add(grd)
+	return in_gaze
 
 
 
@@ -35,7 +59,7 @@ def get_min_gaze(gaze_points, dot, cutoff=100):
 	for g in gaze_points:
 		dist = get_gaze_distance(g, dot)
 
-		if min_dist == -1 or dist < min_dist:
+		if (dist > 0) and (min_dist == -1 or dist < min_dist):
 			min_dist = dist
 			which_gaze = g
 
@@ -47,9 +71,9 @@ def get_min_gaze(gaze_points, dot, cutoff=100):
 
 
 
-def main():
-	tracker_data = get_tracker_data("data/tracker_data.csv")
-	response_data = get_dot_data("data/response_data.csv")
+def main(t_d, r_d, o_d, cutoff, dimensions):
+	tracker_data = get_tracker_data(t_d)
+	response_data = get_dot_data(r_d)
 	
 	trials = pd.unique(response_data["trial_id"])
 
@@ -58,9 +82,21 @@ def main():
 	new_resp_data["gazeY"] = None
 	new_resp_data["gazeDist"] = None
 	new_resp_data["belowX"] = None
+	new_resp_data["totArea"] = None
+	new_resp_data["pctArea"] = None
+
+	left_x = dimensions[0][0]
+	right_x = dimensions[0][1]
+	down_y = dimensions[1][0]
+	up_y = dimensions[1][1]
+	width = abs(left_x - right_x)
+	height =  abs(up_y - down_y)
+	grid_size_y = height/float(n_grid)
+	grid_size_x = width/float(n_grid)
+	grid = make_grid(n_grid, grid_size_x, grid_size_y, left_x, down_y)
 
 	z = 0
-
+	N_row = len(response_data)
 	for z,row in response_data.iterrows():
 		t = row["trial_id"]
 
@@ -69,20 +105,60 @@ def main():
 		gaze = zip(td["GazePointX"], td["GazePoint"])
 		p = row["dl_x"], row["dl_y"]	
 		
-		min_gaze = get_min_gaze(gaze, p, cutoff=500)
-		dist = min_gaze[0]		
-		gaze_x = min_gaze[1][0]
-		gaze_y = min_gaze[1][1]
-		n_below_x = min_gaze[2]
+		min_gaze = get_min_gaze(gaze, p, cutoff=cutoff)
 
-		new_resp_data.at[z, 'gazeDist'] = dist
-		new_resp_data.at[z, 'gazeX'] = gaze_x
-		new_resp_data.at[z, 'gazeY'] = gaze_y
-		new_resp_data.at[z, 'belowX'] = n_below_x
+		grid_in_gaze = get_grid_in_gaze(grid, gaze, cutoff)
 
-	new_resp_data.to_csv("data/dot_gaze.csv", sep="\t")
+		tot_area = grid_size_x * grid_size_y * len(grid_in_gaze)
+		pct_area = tot_area/(float(width*height))
+
+		if min_gaze[1] != None:
+			dist = min_gaze[0]		
+			gaze_x = min_gaze[1][0]
+			gaze_y = min_gaze[1][1]
+			n_below_x = min_gaze[2]
+
+			new_resp_data.at[z, 'gazeDist'] = dist
+			new_resp_data.at[z, 'gazeX'] = gaze_x
+			new_resp_data.at[z, 'gazeY'] = gaze_y
+			new_resp_data.at[z, 'belowX'] = n_below_x
+			new_resp_data.at[z, 'totArea'] = tot_area
+			new_resp_data.at[z, 'pctArea'] = pct_area
+
+
+		else:
+			new_resp_data.at[z, 'gazeDist'] = -1
+			new_resp_data.at[z, 'gazeX'] = -1
+			new_resp_data.at[z, 'gazeY'] = -1
+			new_resp_data.at[z, 'belowX'] = -1
+			new_resp_data.at[z, 'totArea'] = -1
+			new_resp_data.at[z, 'pctArea'] = -1
+		if (z > 0 and z % 1000 == 0):
+			time_so_far = time.time() - t0
+			pct_so_far = float(z+1.)/(time.time() - t0), z/float(N_row)
+
+
+			print (z,time_so_far, pct_so_far, 
+				time_so_far / pct_so_far[1] - time_so_far)
+
+
+	new_resp_data.to_csv(o_d, sep="\t")
 
 
 
 if __name__ == "__main__":
-	main()
+	t0 = time.time()
+	dimensions = ((0,2000),(0,1500))
+	n_grid = 10
+
+	cutoff = 400
+	t_d = "data/estimation_tracker_data.csv"
+	r_d = "data/estimation_response_data.csv"
+	o_d = "data/estimation_dot_gaze.csv"
+	main(t_d, r_d, o_d, cutoff, dimensions)
+	print "Finished Estimation"
+	t_d = "data/discrimination_tracker_data.csv"
+	r_d = "data/discrimination_response_data.csv"
+	o_d = "data/discrimination_dot_gaze.csv"
+	main(t_d, r_d, o_d, cutoff, dimensions)
+	print "Finished Discrimination"
