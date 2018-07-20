@@ -156,8 +156,10 @@ data.resp.avs <- data.resp.loc %>%
                   mutate(arr2 = (which_array==2)*1) %>%
                   mutate(belowX1 = mean(belowX) * arr1) %>%
                   mutate(belowX2 = mean(belowX) * arr2)%>%
-                  mutate(within_x1 =  sum(arr1/(1 + exp(-0.1*belowX)))) %>%
-                  mutate(within_x2 =  sum(arr2/(1 + exp(-0.1*belowX)))) %>%
+                 # mutate(within_x1 =  arr1 * sum((2/(1 + exp(-2 -0.5*belowX)) - 1))) %>%
+                 # mutate(within_x2 =  arr2 * sum((2/(1 + exp(-2 -0.5*belowX)) - 1))) %>%
+                  mutate(within_x1 =  sum(arr1 * (2/(1 + exp(-2 -0.5*belowX))))) %>%
+                  mutate(within_x2 =   sum(arr2 * (2/(1 + exp(-2 -0.5*belowX))))) %>%
                   top_n(n=1, wt=id)%>%
                   group_by(trial_id) %>%
                   mutate(belowX1 = max(belowX1)) %>%
@@ -183,7 +185,7 @@ data.resp.avs.subs <- data.resp.avs %>%
             mutate(Dots_Ratio = (Dots_Shown1 - Dots_Shown2)/(Dots_Shown1**2 + Dots_Shown2**2)**0.5) %>%
             mutate(Abs_Dots_Ratio = abs(Dots_Ratio))
   
-  
+data.resp.avs.subs$Dots_Shown2 -  data.resp.avs.subs$within_x2
 
 summary(glm(data=data.resp.avs.subs, Score ~ abs_within_x_log_diff, family=binomial(link="logit")))
 
@@ -213,44 +215,16 @@ ggplot(data=data.resp.avs.subs, aes(x=abs_within_x_log_diff, y=Score)) +
 
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-break
+
+ggplot(data=data.resp.avs.subs) + 
+      geom_point(aes(Dots_Shown1, within_x1,color="1")) + 
+   geom_point(aes(Dots_Shown2, within_x2, color="2"))  +
+  stat_smooth(aes(Dots_Shown1, within_x1,color="1")) +
+  stat_smooth(aes(Dots_Shown2, within_x2, color="2")) +
+  geom_abline()
+      
   
-data.resp.avs.subs <- data.resp.avs %>%
-                group_by(Trial_End) %>%
-                filter(Trial_End >= 1523639984) %>%
-            mutate(cond=paste(round(Time1),round(Time2),sep="_")) %>%
-
-               # mutate(belowX_diff = ((belowX1 -  belowX2))/((belowX1**2 + belowX2**2))**0.5) %>%
-                mutate(belowX_diff = (belowX1/Time1 -  belowX2/Time2)) %>%
-                mutate(ratio=(Dots_Shown1 - Dots_Shown2)/ (Dots_Shown1**2 + Dots_Shown2**2)**0.5) %>%
-
-                mutate(log_belowX_diff = (log(belowX1) -  log(belowX2))/(log(belowX1)**2 + log(belowX2)**2)**0.5)
-
-
-data.resp.avs.subs$Dots_Counted <- data.resp.avs.subs$Dots_Counted- 1
-
-
-ggplot(data=data.resp.avs.subs, aes(x=belowX_diff, y=Dots_Counted)) +
-        #geom_point() +
-        binomial_smooth(se=TRUE) +
-          geom_hline(yintercept=0.5) +
-        geom_vline(xintercept=0.0)+
-        ylab("Guess 2") +
-        xlab("Sample_2 - Sample_1") +
-        paper_theme
-
-ggsave("figs/sample_disc.pdf")
-ggsave("figs/sample_disc.png")
-
-
-ggplot(data=data.resp.avs.subs, aes(x=log_belowX_diff, y=Dots_Counted)) +
-        #geom_point() +
-        binomial_smooth(se=TRUE) +
-          geom_hline(yintercept=0.5) +
-        geom_vline(xintercept=0.0)+
-        ylab("Guess 2") +
-        xlab("Sample_1 - Sample_2") +
-        paper_theme
+  
 
 
 

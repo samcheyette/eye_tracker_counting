@@ -3,7 +3,9 @@ import csv
 import pandas as pd  
 import time 
 import itertools as it
-
+import scipy.stats as st
+import math
+import numpy as np
 
 def make_grid(n_grid, grid_size_x, grid_size_y, left_x, down_y):
 
@@ -24,6 +26,8 @@ def get_grid_in_gaze(grid, gaze_points, radius):
 			diff = (x_diff**2 + y_diff**2)**0.5
 			if diff < radius:
 				in_gaze.add(grd)
+				break
+
 	return in_gaze
 
 
@@ -51,23 +55,74 @@ def get_gaze_distance(gaze_point, dot_loc):
 	else:
 		return -1
 
-def get_min_gaze(gaze_points, dot, cutoff=100):
+def get_min_gaze(gaze_points, dot,cutoff=100):
 
 	min_dist = -1
 	which_gaze = None
 	n_below_x = 0
-	for g in gaze_points:
+	#p_in_gaze = 0
+	n_continuous_below_x = 0
+	seen_discrete = []
+	n_non_negative = 0
+
+	n_fixate = 0
+	fixate_discrete = []
+	path_length = 0
+
+
+
+	for i in xrange(len(gaze_points)):
+		g = gaze_points[i]
 		dist = get_gaze_distance(g, dot)
+		if dist > 0:
 
-		if (dist > 0) and (min_dist == -1 or dist < min_dist):
-			min_dist = dist
-			which_gaze = g
-
-		if dist < cutoff:
-			n_below_x += 1
+			if (min_dist == -1 or dist < min_dist):
+				min_dist = dist
+				which_gaze = g
 
 
-	return min_dist, which_gaze, n_below_x
+
+			if dist < cutoff:
+
+				n_below_x += 1
+				n_continuous_below_x += 1
+
+			if ((i == (len(gaze_points) - 1)) or (cutoff <= dist)):
+
+				if ((n_continuous_below_x > 0) or 
+					(i == (len(gaze_points) - 1))):
+					seen_discrete.append(n_continuous_below_x)
+				n_continuous_below_x = 0
+
+
+		if i == 0:
+			g_prev = g
+		else:
+			if g[0] > 0 and g_prev > 0:
+				n_non_negative += 1
+
+				dist_from_prev = get_gaze_distance(g, g_prev)
+				path_length  += get_gaze_distance(g, gaze_points[i-1])
+				if  (dist_from_prev < 20):
+					n_fixate += 1.
+				if ((dist_from_prev >= 20) or
+					 (i == (len(gaze_points) - 1))):
+					fixate_discrete.append(n_fixate)
+					n_fixate = 0
+					g_prev = g
+
+	if n_non_negative > 0:
+		fixate_discrete = np.array(fixate_discrete)
+		med_fix = np.mean(fixate_discrete)
+	else:
+		med_fix = -1
+
+
+	n_looks =  len(seen_discrete) * (n_below_x > 0)
+
+
+
+	return min_dist, which_gaze, n_below_x, n_looks, med_fix, path_length
 
 
 
@@ -97,6 +152,7 @@ def main(t_d, r_d, o_d, cutoff, dimensions):
 
 	z = 0
 	N_row = len(response_data)
+	prev_gp = {}
 	for z,row in response_data.iterrows():
 		t = row["trial_id"]
 
@@ -104,8 +160,9 @@ def main(t_d, r_d, o_d, cutoff, dimensions):
 
 		gaze = zip(td["GazePointX"], td["GazePoint"])
 		p = row["dl_x"], row["dl_y"]	
-		
-		min_gaze = get_min_gaze(gaze, p, cutoff=cutoff)
+
+
+		min_gaze = get_min_gaze(gaze, p,  cutoff=cutoff)
 
 		grid_in_gaze = get_grid_in_gaze(grid, gaze, cutoff)
 
@@ -117,6 +174,9 @@ def main(t_d, r_d, o_d, cutoff, dimensions):
 			gaze_x = min_gaze[1][0]
 			gaze_y = min_gaze[1][1]
 			n_below_x = min_gaze[2]
+			n_looks = min_gaze[3]
+			med_fix = min_gaze[4]
+			path_length = min_gaze[5]
 
 			new_resp_data.at[z, 'gazeDist'] = dist
 			new_resp_data.at[z, 'gazeX'] = gaze_x
@@ -124,7 +184,9 @@ def main(t_d, r_d, o_d, cutoff, dimensions):
 			new_resp_data.at[z, 'belowX'] = n_below_x
 			new_resp_data.at[z, 'totArea'] = tot_area
 			new_resp_data.at[z, 'pctArea'] = pct_area
-
+			new_resp_data.at[z, 'nLooks'] = n_looks
+			new_resp_data.at[z, 'medFix'] = med_fix
+			new_resp_data.at[z, 'pathLength'] = path_length
 
 		else:
 			new_resp_data.at[z, 'gazeDist'] = -1
@@ -133,6 +195,10 @@ def main(t_d, r_d, o_d, cutoff, dimensions):
 			new_resp_data.at[z, 'belowX'] = -1
 			new_resp_data.at[z, 'totArea'] = -1
 			new_resp_data.at[z, 'pctArea'] = -1
+			new_resp_data.at[z, 'nLooks'] = -1
+			new_resp_data.at[z, 'medFix'] = -1
+			new_resp_data.at[z, 'pathLength'] = -1
+
 		if (z > 0 and z % 1000 == 0):
 			time_so_far = time.time() - t0
 			pct_so_far = float(z+1.)/(time.time() - t0), z/float(N_row)
@@ -151,7 +217,7 @@ if __name__ == "__main__":
 	dimensions = ((0,2000),(0,1500))
 	n_grid = 10
 
-	cutoff = 400
+	cutoff = 500
 	t_d = "data/estimation_tracker_data.csv"
 	r_d = "data/estimation_response_data.csv"
 	o_d = "data/estimation_dot_gaze.csv"
