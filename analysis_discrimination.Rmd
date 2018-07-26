@@ -39,7 +39,11 @@ paper_theme <- theme(
   strip.text=element_blank(),
           strip.background = element_blank())
 
-
+paper_theme_2 <- theme_light() + theme(axis.title.x = element_text(size=18),
+  axis.text.x=element_text(colour="black", 
+                           size = 14), 
+  axis.title.y = element_text(size = 18, vjust = 1),
+  axis.text.y  = element_text(size = 14))
 binomial_smooth <- function(...) {
   geom_smooth(method = "glm", method.args = list(family = "binomial"), ...)
 }
@@ -142,90 +146,251 @@ ggsave("figs/disc_score.png")
 #levels(factor(data.resp$cond))
 #data.resp$cond <-factor(data.resp$cond, levels = levels(factor(data.resp$cond))[c(2,1,3)])
 
-#summary(glm(data=data.resp, Dots_Counted ~ ratio + cond, family=binomial(link="probit")))
+summary(glm(data=data.resp, Dots_Counted ~ ratio + Time1 + Time2,  family=binomial(link="probit")))
+
 ```
 
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 
 
-data.resp.avs <- data.resp.loc %>%
+data.resp.avs <- data.resp.loc %>% 
                   filter(gazeDist > 0) %>%
                   group_by(trial_id, which_array) %>%
                   mutate(arr1 = (which_array==1)*1) %>%
                   mutate(arr2 = (which_array==2)*1) %>%
                   mutate(belowX1 = mean(belowX) * arr1) %>%
                   mutate(belowX2 = mean(belowX) * arr2)%>%
-                 # mutate(within_x1 =  arr1 * sum((2/(1 + exp(-2 -0.5*belowX)) - 1))) %>%
-                 # mutate(within_x2 =  arr2 * sum((2/(1 + exp(-2 -0.5*belowX)) - 1))) %>%
-                  mutate(within_x1 =  sum(arr1 * (2/(1 + exp(-2 -0.5*belowX))))) %>%
-                  mutate(within_x2 =   sum(arr2 * (2/(1 + exp(-2 -0.5*belowX))))) %>%
+                  mutate(pathLength1 = mean(pathLength) * arr1) %>%
+                  mutate(pathLength2 = mean(pathLength) * arr2)%>%
+                  mutate(medFix1 = mean(medFix) * arr1) %>%
+                  mutate(medFix2 = mean(medFix) * arr2) %>%
+                  mutate(pctArea1 = mean(pctArea) * arr1) %>%
+                  mutate(pctArea2 = mean(pctArea) * arr2) %>%
+                  mutate(within_x1 =  1/(1 + exp(-0.5 *belowX))) %>%
+                  mutate(within_x2 =   1/(1 + exp(-0.5 *belowX)))  %>%
+                  #mutate(within_x1 =  2/(1 + exp(-3 - 4 *belowX)) - 1) %>%
+                 # mutate(within_x2 =   (2/(1 + exp(-3 - 4*belowX)) - 1))  %>%
+                  mutate(within_x1 = arr1* sum(within_x1)) %>%
+                  mutate(within_x2 = arr2*sum(within_x2)) %>%
                   top_n(n=1, wt=id)%>%
-                  group_by(trial_id) %>%
+                  group_by(pid, Trial, Time1, Time2) %>%
+                  mutate(pctArea1 = max(pctArea1)) %>%
+                  mutate(pctArea2 = max(pctArea2)) %>%
                   mutate(belowX1 = max(belowX1)) %>%
                   mutate(belowX2 = max(belowX2)) %>%
                   mutate(within_x1 = max(within_x1)) %>%
                   mutate(within_x2=max(within_x2)) %>%
-                 top_n(n=1, wt=id)
+                  mutate(pathLength1 = max(pathLength1)) %>%
+                  mutate(pathLength2 = max(pathLength2))%>%
+                  mutate(medFix1 = max(medFix1)) %>%
+                  mutate(medFix2 = max(medFix2))%>%
+                 top_n(n=1, wt=id) %>%
+                mutate(within_x1_pct = within_x1 / Dots_Shown1) %>%
+                mutate(within_x2_pct = within_x2 / Dots_Shown2) %>% 
+                mutate(within_x_pct_ratio = (within_x1 - within_x2)/((within_x1**2 + within_x2**2)**0.5)) %>%
+               mutate(cond=paste(round(Time1),round(Time2),sep="_")) 
 
+data.resp.avs.subs <- data.resp.avs %>%
+            
+            filter((Trial_End >= 1523639984) & ((within_x1) >  0 & (within_x2 > 0))) %>%
+            group_by(Trial_End) %>%
+            mutate(within_x_diff = (within_x1 - within_x2)) %>%
+            mutate(within_x_ratio = (within_x1 - within_x2)/(within_x1**2 + within_x2**2)**0.5) %>%
+            mutate(within_x_log_diff = (log(within_x1) - log(within_x2)))  %>%
+            mutate(abs_within_x_log_diff = abs(within_x_log_diff))  %>%
+  
+            mutate(log_Dots_Diff =  log(Dots_Shown1) - log(Dots_Shown2)) %>%
+            mutate(Dots_Ratio = (Dots_Shown1 - Dots_Shown2)/(Dots_Shown1**2 + Dots_Shown2**2)**0.5) %>%
+            mutate(Abs_Dots_Ratio = abs(Dots_Ratio))  %>%
+            mutate(Dots_Counted = Dots_Counted - 1) %>%
+            mutate(Score = Score - 1)
+
+
+subs_cop <- cbind(data.resp.avs.subs)
+
+f_get_weber <- function(whomst) {
+  whomst <- whomst[1]
+  df <- subset(subs_cop, as.numeric(as.character(subs_cop$pid)) == as.numeric(whomst))
+  reg <- glm(data=df, I(1-Dots_Counted) ~ Dots_Ratio - 1, family=binomial(link="probit"))
+  return(1/(coef(reg)["Dots_Ratio"]))
+}
+
+
+
+data.resp.avs.subs <- data.resp.avs.subs %>%
+            group_by(pid) %>%
+            mutate(weber = f_get_weber(pid)) %>%
+            mutate(log_PL1=log(pathLength1+1)) %>%
+            mutate(log_PL2=log(pathLength2 + 1)) %>%
+            mutate(log_PL = log(pathLength2 * pathLength1 + 1)) %>%
+            mutate(log_fix1 = log(medFix1 + 1)) %>%
+            mutate(log_fix2 = log(medFix2 + 1)) %>%
+            mutate(log_fix = log_fix1 + log_fix2) %>%
+            rowwise() %>%
+            mutate(pctArea= pctArea1 + pctArea2) %>%
+
+            mutate(dens_norm1 = within_x1/pctArea1) %>%
+            mutate(dens_norm2 = within_x2/pctArea2) %>%
+            mutate(dens_norm = log(dens_norm1) - log(dens_norm2)) %>% 
+            mutate(dens_norm_err =dens_norm * (1 * (dens_norm1 < dens_norm2) * (Dots_Shown1 > Dots_Shown2) + 1 * (dens_norm1 > dens_norm2)  * (Dots_Shown1 < Dots_Shown2))) %>% 
+
+            mutate(acc_err = (within_x1 - within_x2) *  (1 * (within_x1 < within_x2) * (Dots_Shown1 > Dots_Shown2) + 1 *  (within_x1 > within_x2) * (Dots_Shown1 < Dots_Shown2) )) %>% 
+            #mutate(dens_norm_abs_err = abs(dens_norm_err)) %>% 
+            mutate(acc_err_bin  =  1 * (within_x1 < within_x2) * (Dots_Shown1 > Dots_Shown2) - 1 *  (within_x1 > within_x2) * (Dots_Shown1 < Dots_Shown2)) %>% 
+            mutate(dens_norm_err_bin  =  1 * (dens_norm1 < dens_norm2) * (Dots_Shown1 > Dots_Shown2) - 1 *  (dens_norm1 > dens_norm2) * (Dots_Shown1 < Dots_Shown2)) %>% 
+
+            ungroup
+  
 
 ```
 
-```{r}
+```{r, fig.width=7, fig.height=5}
 
-data.resp.avs.subs <- data.resp.avs %>%
-                group_by(Trial_End) %>%
-                filter(Trial_End >= 1523639984) %>%
-            mutate(cond=paste(round(Time1),round(Time2),sep="_")) %>%
-            mutate(within_x_diff = (within_x1 - within_x2)) %>%
-            mutate(within_x_log_diff = (log(within_x1) - log(within_x2)))  %>%
-            mutate(abs_within_x_log_diff = abs(within_x_log_diff))  %>%
 
-            mutate(Dots_Counted = Dots_Counted - 1) %>%
-            mutate(Dots_Ratio = (Dots_Shown1 - Dots_Shown2)/(Dots_Shown1**2 + Dots_Shown2**2)**0.5) %>%
-            mutate(Abs_Dots_Ratio = abs(Dots_Ratio))
   
-data.resp.avs.subs$Dots_Shown2 -  data.resp.avs.subs$within_x2
 
-summary(glm(data=data.resp.avs.subs, Score ~ abs_within_x_log_diff, family=binomial(link="logit")))
+#SANITY CHECK
+ggplot(data=data.resp.avs.subs, aes(x=Dots_Shown1, y=within_x1)) +
+     geom_point() + 
+      geom_abline() +
+      #stat_summary_bin()+
+      stat_smooth(method="loess") +
 
-#summary(glm(data=data.resp.avs.subs, Score ~ Time1 * Time2 , family=binomial(link="logit")))
-summary(glm(data=data.resp.avs.subs, Score ~ Abs_Dots_Ratio, family=binomial(link="probit")))
-
-summary(glm(data=data.resp.avs.subs, Score ~ abs_within_x_log_diff * Abs_Dots_Ratio, family=binomial(link="probit")))
+      facet_wrap(~cond) +
+      paper_theme_2 
 
 
-summary(glm(data=data.resp.avs.subs, Dots_Counted ~Dots_Ratio, family=binomial(link="logit")))
-
-summary(glm(data=data.resp.avs.subs, Dots_Counted ~ within_x_diff * Dots_Ratio, family=binomial(link="logit")))
-
-summary(glm(data=data.resp.avs.subs, Dots_Counted ~ within_x_log_diff, family=binomial(link="logit")))
 
 ggplot(data=data.resp.avs.subs, aes(x=abs_within_x_log_diff, y=Score)) +
         binomial_smooth(se=TRUE) +
           geom_hline(yintercept=0.5) +
         geom_vline(xintercept=0.0)+
-        ylab("Guess 2") +
-        xlab("Sample_2 - Sample_1") +
+        ylab("Score") +
+        xlab("Absolute seen ratio") +
         paper_theme
+
+
+ggplot(data=data.resp.avs.subs, aes(x=within_x_log_diff, y=Dots_Counted, color=cond)) +
+        binomial_smooth(se=TRUE) +
+          geom_hline(yintercept=0.5) +
+        geom_vline(xintercept=0.0)+
+        ylab("Guess 2") +
+        xlab("Seen ratio") +
+        paper_theme_2 
+
+#THIS IS COOL -- SHOWS THAT YOU CAN ACCOUNT FOR ERROR
+
+ggplot(data=data.resp.avs.subs, aes(x=(within_x_ratio ), 
+                                          y=Dots_Counted)) +
+      geom_point() +
+      paper_theme_2 +
+     # facet_wrap(~cond)
+       binomial_smooth(se=TRUE) 
+
+
+#How well does 
+ggplot(data=subset(data.resp.avs.subs, data.resp.avs.subs$dens_norm_err != 0), 
+        aes(x=dens_norm_err, y=Dots_Counted, color="Density")) +
+#ggplot(data=data.resp.avs.subs, aes(x=dens_norm_err, y=Dots_Counted, color="Density")) +
+             stat_summary_bin(bins=4) +
+            binomial_smooth() +
+          #  binomial_smooth(aes(x=acc_err, y=Dots_Counted, color="Accumulator"))  +
+            paper_theme_2
+
+
+ggplot(data=subset(data.resp.avs.subs, data.resp.avs.subs$dens_norm_err != 0), 
+        aes(x=dens_norm_err)) +
+      geom_histogram(bins=10,aes(fill=factor(Dots_Counted))) +
+      paper_theme_2 +
+      facet_wrap(~cond, nrow=4) +
+      geom_vline(xintercept=0)
+
+ggplot(data=data.resp.avs.subs) + 
+        stat_summary(aes(x=acc_err_bin, y=Dots_Counted))  
+  
+#ggplot(data=data.resp.avs.subs, aes(color=cond)) + 
+ggplot(data=data.resp.avs.subs) + 
+            stat_summary(aes(x=factor(dens_norm_err_bin), y=Dots_Counted), 
+                           geom="bar", size=1., alpha=0.5)  +
+          stat_summary(aes(x=factor(dens_norm_err_bin), y=Dots_Counted), 
+                           geom="point", size=2.)  +
+          stat_summary(aes(x=factor(dens_norm_err_bin), y=Dots_Counted), 
+                         geom="errorbar", width=0.25, size=1.)  +
+      scale_x_discrete(labels=c("See 2 > 1, falsely", "Correctly estimate", "See 1 > 2, falsely")) +
+        xlab("") + ylab("P(Choose 2)")  +
+        #facet_wrap(~cond) #+
+        paper_theme_2
+
+
+summary(glm(data=data.resp.avs.subs, within_x1_pct ~  log_PL1))
+
+summary(glm(data=data.resp.avs.subs, within_x2_pct ~ Dots_Shown2 * log_fix2))
+
+summary(glm(data=data.resp.avs.subs, Score ~ pctArea + Abs_Dots_Ratio, family=binomial(link="probit")))
 
 ```
 
 
 
 
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
-
-ggplot(data=data.resp.avs.subs) + 
-      geom_point(aes(Dots_Shown1, within_x1,color="1")) + 
-   geom_point(aes(Dots_Shown2, within_x2, color="2"))  +
-  stat_smooth(aes(Dots_Shown1, within_x1,color="1")) +
-  stat_smooth(aes(Dots_Shown2, within_x2, color="2")) +
-  geom_abline()
-      
-  
-  
+```{r}
 
 
+
+subs <- data.resp.avs.subs %>%
+        #group_by(pid, cond) %>%
+        group_by(pid) %>%
+
+        #mutate(weber = f_get_weber(pid)) %>%
+        mutate(Score=mean(Score)) %>%
+        mutate(pathLength1=mean(pathLength1)) %>%
+        mutate(pathLength2=mean(pathLength2)) %>%
+        mutate(medFix1=mean(medFix1)) %>%
+        mutate(medFix2=mean(medFix2)) %>%
+        mutate(log_PL1=log(pathLength1+.01)) %>%
+        mutate(log_PL2=log(pathLength2+.01)) %>%
+        mutate(log_PL = log(pathLength2 + pathLength1)) %>%
+        mutate(log_fix1 = log(medFix1 + 1)) %>%
+        mutate(log_fix2 = log(medFix2 + 1)) %>%
+        mutate(log_fix = log_fix1 + log_fix2)  %>%
+        mutate(pctArea1 = mean(pctArea1)) %>%
+        mutate(pctArea2 = mean(pctArea2)) %>%
+
+        top_n(n=1,wt=id)
+
+
+
+#ggplot(subs, aes(x=log_PL, y=weber, group=cond, color=cond)) +
+ggplot(subs, aes(x=pctArea, y=Score)) +
+#ggplot(data.resp.avs.subs, aes(x=abs((log_PL1 + log_PL2) - (log(Dots_Shown1) + log(Dots_Shown2))), y=weber)) +
+        geom_point() + 
+      #binomial_smooth() + 
+
+        #stat_summary_bin(fun.data="mean_cl_boot", bins=9) +
+       # stat_summary(fun.data="mean_cl_boot") +
+      stat_smooth(method="lm")  +
+      #ylim(0,1) +
+      #coord_cartesian(ylim=c(0.1,0.3)) +
+    # facet_wrap(~cond, scales="free") +
+      paper_theme_2
+
+#ggplot(data.resp.avs.subs, aes(x=log_PL, y=weber, group=cond, color=cond)) +
+ggplot(subs, aes(x=log_fix, y=weber)) +
+        geom_point() +
+     # stat_summary_bin(fun.data="mean_cl_boot", bins=9) +
+      stat_smooth(method="lm")  +
+      #ylim(0,1) +
+      #coord_cartesian(ylim=c(0.1,0.3)) +
+      facet_wrap(~cond) +
+      paper_theme_2 +
+      xlab("Average fixation time")
+
+
+
+
+
+summary(glm(data=subs, Score ~ log_PL, family=binomial(link="probit")))
+        
 
 ```

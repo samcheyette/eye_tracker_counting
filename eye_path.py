@@ -129,9 +129,20 @@ def get_min_gaze(gaze_points, dot,cutoff=100):
 def main(t_d, r_d, o_d, cutoff, dimensions):
 	tracker_data = get_tracker_data(t_d)
 	response_data = get_dot_data(r_d)
-	
-	trials = pd.unique(response_data["trial_id"])
 
+	unique_trial_resp = pd.unique(response_data["trial_id"])
+	unique_trial_tracker = pd.unique(tracker_data["trial_id"])
+	print len(unique_trial_resp), len(unique_trial_tracker)
+	if (len(unique_trial_resp) != len(unique_trial_tracker)):
+		#discrimination data
+		response_data["trial_id"] = (response_data["trial_id"]-1)* 2 + response_data["which_array"] 
+
+		unique_trial_resp = pd.unique(response_data["trial_id"])
+		unique_trial_tracker = pd.unique(tracker_data["trial_id"])
+
+		assert(list(unique_trial_resp)==list(unique_trial_tracker))
+
+	trials = pd.unique(response_data["trial_id"])
 	new_resp_data = copy.deepcopy(response_data)
 	new_resp_data["gazeX"] = None
 	new_resp_data["gazeY"] = None
@@ -139,6 +150,9 @@ def main(t_d, r_d, o_d, cutoff, dimensions):
 	new_resp_data["belowX"] = None
 	new_resp_data["totArea"] = None
 	new_resp_data["pctArea"] = None
+	new_resp_data.at['nLooks'] = None
+	new_resp_data.at['medFix'] = None
+	new_resp_data.at['pathLength'] = None
 
 	left_x = dimensions[0][0]
 	right_x = dimensions[0][1]
@@ -160,7 +174,6 @@ def main(t_d, r_d, o_d, cutoff, dimensions):
 
 		gaze = zip(td["GazePointX"], td["GazePoint"])
 		p = row["dl_x"], row["dl_y"]	
-
 
 		min_gaze = get_min_gaze(gaze, p,  cutoff=cutoff)
 
@@ -212,6 +225,8 @@ def main(t_d, r_d, o_d, cutoff, dimensions):
 
 
 
+
+
 if __name__ == "__main__":
 	t0 = time.time()
 	dimensions = ((0,2000),(0,1500))
@@ -223,8 +238,8 @@ if __name__ == "__main__":
 	o_d = "data/estimation_dot_gaze.csv"
 	main(t_d, r_d, o_d, cutoff, dimensions)
 	print "Finished Estimation"
-	t_d = "data/discrimination_tracker_data.csv"
-	r_d = "data/discrimination_response_data.csv"
-	o_d = "data/discrimination_dot_gaze.csv"
-	main(t_d, r_d, o_d, cutoff, dimensions)
-	print "Finished Discrimination"
+	#t_d = "data/discrimination_tracker_data.csv"
+	#r_d = "data/discrimination_response_data.csv"
+	#o_d = "data/discrimination_dot_gaze.csv"
+	#main(t_d, r_d, o_d, cutoff, dimensions)
+	#print "Finished Discrimination"
