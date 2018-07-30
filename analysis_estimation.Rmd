@@ -111,7 +111,11 @@ data.tracker <- data.tracker %>%
 data.tracker$id <- seq.int(1,nrow(data.tracker))
 
 
+            
+```
 
+
+```{r}
 data.resp$Time_Num =data.resp$Time
 data.resp$Time <- as.factor(round(data.resp$Time,2))
 
@@ -148,7 +152,6 @@ data.resp <- data.resp %>%
 data.resp.old <- cbind(data.resp)
             
 ```
-
 
 ```{r, fig.width=6, fig.height=5}
 
@@ -233,24 +236,25 @@ ggplot(data.resp, aes(x=Time, y=abs_pct_err, fill=cut(Dots_Shown, 3))) +
         paper_theme_3 +
         guides(fill=guide_legend(title="Dots shown"))
 
-ggplot(data=data.resp, aes(x=Time, y=abs_pct_err)) +
-      stat_summary(geom="bar", alpha=0.7, fun.y="mean") +
+ggplot(data=data.resp, aes(x=Time, y=100*abs_pct_err)) +
+      stat_summary(geom="bar", alpha=0.8, fun.y="mean") +
       stat_summary(geom="errorbar", width=0.1,size=1.0, fun.data="mean_se") +
       stat_summary(geom="point", fun.y="mean") +
 
         xlab("Time (s)") +
-        ylab("Absolute percent error") +
+        ylab("Percent absolute error") +
         theme_light() + paper_theme_3 
+ggsave("figs/Time_Abs_Pct_Err.png", width=5, height=4, dpi=400)
 
-ggplot(data=data.resp, aes(x=Time, y=pct_err)) +
-      stat_summary(geom="bar", alpha=0.7, fun.y="mean") +
+ggplot(data=data.resp, aes(x=Time, y=100*pct_err)) +
+      stat_summary(geom="bar", alpha=0.8, fun.y="mean") +
       stat_summary(geom="errorbar", width=0.1,size=1.0, fun.data="mean_se") +
       stat_summary(geom="point", fun.y="mean") +
 
         xlab("Time (s)") +
         ylab("Percent error") +
         theme_light() + paper_theme_3 
-ggsave("figs/Time_Pct_Err.png", width=4.25, height=4.5, dpi=400)
+ggsave("figs/Time_Pct_Err.png", width=5, height=4, dpi=400)
 
 ggplot(data=data.resp) +
       stat_summary(geom="bar", alpha=0.7, fun.y="mean", aes(x=Time, y=pct_err, fill="Total error")) +
@@ -280,37 +284,57 @@ summary(glm(data=data.resp, corr ~ Dots_Shown  + Time_Num, family=binomial()))
 summary(lm(data=data.resp, err ~ Dots_Shown  + Time_Num))
 summary(lm(data=data.resp, abs_err ~ Dots_Shown  + Time_Num))
 
-summary(lm(data=data.resp, pct_err ~ Dots_Shown  * Time_Num))
-summary(lm(data=data.resp, abs_pct_err ~ Dots_Shown  * Time_Num))
+summary(lm(data=data.resp, pct_err ~ poly(Dots_Shown,2)  + log(Time_Num)))
+summary(lm(data=data.resp, abs_pct_err ~ poly(Dots_Shown,2)  + log(Time_Num)))
+summary(lm(data=data.resp, pct_err ~ Dots_Shown * Time_Num))
+summary(lm(data=data.resp, abs_pct_err ~ Dots_Shown * Time_Num))
 
 #reg.abs <- lmer(data=data.resp, Dots_Counted ~ Dots_Shown * Time - 1 + (Dots_Shown|pid))
 
 
 
-r.squaredGLMM(reg.abs)
-r.squaredGLMM(reg.err)
+#r.squaredGLMM(reg.abs)
 
 
-bw <- 18
+bw <- 13
 ggplot(data.resp, aes(x=Dots_Shown, y=abs_pct_err, color=Time)) +
         stat_smooth(method="loess",span=1, se=FALSE) +
-        stat_smooth(method="loess",span=1, se=TRUE,alpha=0.2) +
+        stat_smooth(method="loess",span=1, se=TRUE,alpha=0.1) +
 
-        stat_summary_bin(aes(x=Dots_Shown-bw/2), binwidth=bw, geom="errorbar", 
+        stat_summary_bin(aes(x=Dots_Shown), binwidth=bw, geom="errorbar", 
                          fun.data="mean_se", position=position_dodge(width=1), size=1.7, width=0.25, alpha=0.9) +
 
-        stat_summary_bin(aes(x=Dots_Shown-bw/2), binwidth=bw,geom="point", fun.y="mean", position=position_dodge(width=1), size=1, alpha=1) +
+        stat_summary_bin(aes(x=Dots_Shown), binwidth=bw,geom="point", fun.y="mean", position=position_dodge(width=1), size=2.5, alpha=1) +
 
-        #stat_summary(fun.data="mean_se") +
 
-        geom_abline() +
-        ylab("Estimated number") +
         theme_light() + 
-       # xlim(10,80) + 
-       # ylim(0,125) +
-        coord_cartesian(xlim=c(0,79), ylim=c(0,0.5)) +
-       # facet_wrap(~Time) +
-    paper_theme_3  
+        xlim(10,81) + 
+        xlab("Dots Shown") + ylab("Percent absolute error") +
+        geom_hline(yintercept=0) +
+        paper_theme_3  +
+        scale_y_continuous(labels = scales::percent)  
+ggsave("figs/Abs_Pct_Err.png", width=5,height=4)
+
+bw <- 13
+ggplot(data.resp, aes(x=Dots_Shown, y=pct_err, color=Time)) +
+        stat_smooth(method="loess",span=1, se=FALSE) +
+        stat_smooth(method="loess",span=1, se=TRUE,alpha=0.1) +
+
+        stat_summary_bin(aes(x=Dots_Shown), binwidth=bw, geom="errorbar", 
+                         fun.data="mean_se", position=position_dodge(width=1), size=1.7, width=0.25, alpha=0.9) +
+
+        stat_summary_bin(aes(x=Dots_Shown), binwidth=bw,geom="point", fun.y="mean", position=position_dodge(width=1), size=2.5, alpha=1) +    
+        theme_light() + 
+        xlim(8,81) + 
+        xlab("Dots Shown") + ylab("Percent error") +
+        geom_hline(yintercept=0) +
+
+        paper_theme_3 +
+          #scale_x_log10(breaks=seq.int(0.6,1,0.2), labels=scales::percent, limits=c(0.58,1.02)) +
+           # scale_y_log10(breaks=seq.int(-0.5,0.0,0.1), labels=scales::percent) 
+          scale_y_continuous(labels = scales::percent)  
+#scale_x_continuous(labels = scales::percent)  
+ggsave("figs/Pct_Err.png", width=5,height=4)
 
 
 bw <- 9
@@ -334,7 +358,7 @@ ggplot(data.resp, aes(x=Dots_Shown, y=Dots_Counted)) +
                             ylim=c(-28,80)) +
           xlim(8,81) +
 
-        ylab("Estimate") + xlab("Dots shown") +
+        ylab("Number of dots") + xlab("Dots shown") +
         #facet_wrap(~Time)  +
       
         facet_wrap(~Time, nrow=1) +
@@ -344,6 +368,134 @@ ggplot(data.resp, aes(x=Dots_Shown, y=Dots_Counted)) +
    guides(color="none")
 
 ggsave("figs/Shown_Count.png", width=8.5, height=4.5, dpi=400)
+
+
+data.resp$time_num <- as.numeric(as.character(data.resp$Time))
+
+
+data.resp.old <- cbind(data.resp)
+
+```
+
+
+
+
+
+
+
+
+
+```{r}
+data.resp <- cbind(data.resp.old) %>%
+                group_by(Subject, pid, Time) %>%
+              top_n(n=16, wt=id) 
+
+data.resp.cop <- cbind(data.resp)
+
+
+
+f_get_pred <- function(who) {
+  who <- who[1]
+  subs <- data.resp.cop %>%
+          filter(Subject == who)
+  
+  r.1 <- loess(data=subs, Dots_Counted ~ time_num * Dots_Shown  )
+  pred.1 <- predict(r.1, type="response", interval="prediction")
+
+  return(pred.1)
+
+}
+
+data.resp <- data.resp %>%
+              group_by(Subject) %>%
+              mutate(pred=f_get_pred(Subject)) %>%
+              mutate(dev = abs(Dots_Counted - pred)) %>%
+              filter(dev < 20) 
+
+data.resp.cop <- cbind(data.resp)
+data.resp <- data.resp %>%
+              group_by(Subject) %>%
+              mutate(pred=f_get_pred(Subject))
+
+data.resp.cop <- cbind(data.resp)
+
+f_get_weber <- function(who, t) {
+  who <- who[1]
+  subs <- data.resp.cop %>%
+          filter((Subject == who) & (time_num == t))
+          #filter(Subject == who)
+
+  r.2 <- glm(data=subs, dev ~ Dots_Shown - 1)
+  
+  return(r.2$coefficients["Dots_Shown"])
+
+  
+  
+}
+
+
+f_get_pred_dev <- function(who) {
+  who <- who[1]
+  subs <- data.resp.cop %>%
+          filter(Subject == who)
+  r.2 <- loess(data=subs, dev ~ Dots_Shown * time_num)
+  pred.2 <- predict(r.2, type="response", interval="prediction")
+
+  return(pred.2)
+
+  
+  
+}
+
+
+data.resp <- data.resp %>%
+              group_by(Subject) %>%
+             mutate(pred_dev = f_get_pred_dev(Subject)) %>%
+              group_by(Subject, Time) %>%
+              mutate(weber=f_get_weber(Subject, time_num))
+          
+
+#r.1 <- loess(data=data.resp, Dots_Counted ~ time_num  * Dots_Shown  )
+
+#pred.1 <- predict(r.1, type="response", interval="prediction")
+#data.resp$pred_dots <- pred.1
+#data.resp$dev <- abs(data.resp$Dots_Counted - data.resp$pred_dots)
+#data.resp <- subset(data.resp, data.resp$dev < 25)
+#r.2 <- glm(data=data.resp, dev ~ Dots_Shown * time_num)
+#pred.2 <- predict(r.2, type="response", interval="prediction")
+#data.resp$pred_dev <- pred.2
+
+
+
+
+              
+          
+
+#ggplot(data=data.resp, aes(x=Dots_Shown, y=pred_dots, color=Time)) +
+      #  stat_smooth(se=FALSE) 
+
+#ggplot(data=data.resp.agg, aes(x=Time, y=dev)) +
+    #    stat_summary(fun.data="mean_se") +
+    #  stat_smooth(method="lm", se=TRUE)  
+
+ggplot(data=data.resp, aes(x=dev)) +
+       geom_histogram(bins=40)
+
+ggplot(data=data.resp, aes(x=Dots_Shown, y=pred_dev, color=Time)) +
+     #stat_summary_bin(fun.data="mean_se", bins=3) +
+     stat_smooth(se=FALSE)
+
+ggplot(data=data.resp, aes(x=Time, y=pred_dev))  +
+      stat_summary(fun.data="mean_se") #+
+
+
+data.resp.agg <- data.resp %>%
+          group_by(Time, Subject) %>%
+          top_n(n=1, wt=id)
+
+ggplot(data=data.resp, aes(x=Time, y=weber))  +
+      stat_summary(fun.data="mean_se")  #+
+     # geom_point()
 
 
 
@@ -358,21 +510,20 @@ ggsave("figs/Shown_Count.png", width=8.5, height=4.5, dpi=400)
                   filter(gazeDist > 0 & Dots_Shown < 150 & Dots_Shown >= 10) %>%
                   mutate(err=Dots_Counted - Dots_Shown) %>%
                   mutate(abs_err = abs(err)) %>%
-                  #mutate(within_x = (gazeDist < 100)*1) %>%
-                  #mutate(within_x = 1.*(belowX > 1) + 0.5 * (belowX > 3) + 0.2 * (belowX > 6) + 0.25 * (belowX > 10)) %>%
+                  #mutate(within_x = (gazeDist < 100)*0.65 + (gazeDist < 250) * 0.2 + 0.05) %>%
+                 # mutate(within_x = 1 -  0.5**((belowX+.01)*0.5)) %>%
+                  #mutate(within_x = (1-(1/(belowX+1.5))**0.5)) %>%
                   mutate(within_x = 2/(1 + exp(-1 -0.25*belowX)) - 1) %>%
-
-                 # mutate(within_x = 2/(1 + exp(-0.6 -0.3*belowX)) - 1) %>%
-                  #mutate(within_x = 1 * (belowX > 4)) %>% 
                   group_by(trial_id) %>% 
                   mutate(belowX = mean(belowX)) %>%
+
                   mutate(within_x = mean(within_x)) %>%
-                  mutate(within_x_tot = sum(within_x)) %>%
+                  mutate(within_x=mean(pInGaze**0.25)) %>%
+                  mutate(within_x_tot=sum(within_x)) %>%
                   mutate(nLooks = mean(nLooks)) %>%
                   mutate(pathLength = mean(pathLength)) %>%
                   mutate(medFix = mean(medFix)) %>%
-
-                      mutate(mean_dist=sum(gazeDist)/Dots_Shown) %>%
+                  mutate(mean_dist=sum(gazeDist)/Dots_Shown) %>%
                   mutate(mean_abs_err = mean(abs_err)) %>%
                   mutate(pct_err=err/Dots_Shown) %>%
                     mutate(abs_pct_err=abs_err/Dots_Shown) %>%
@@ -383,27 +534,21 @@ ggsave("figs/Shown_Count.png", width=8.5, height=4.5, dpi=400)
 
 ```
 
+```{r}
+
+
+
+data.resp.avs$time_num <- as.numeric(as.character(data.resp.avs$Time))
+r.1 <- lm(data=data.resp.avs, pct_err ~ time_num)
+r.2 <- lm(data=data.resp.avs, pct_err ~ time_num + within_x)
+
+summary(r.1)
+summary(r.2)
+
+anova(r.1,r.2)
+```
 
 ```{r, fig.width=7.5, fig.height=5, results='asis', message=FALSE, echo=FALSE, warning=FALSE}
-
-#summary(lmer(data=data.resp.avs, pct_err ~ belowX + Time + (1|pid)))
-#summary(lm(data=data.resp.avs, pct_err ~  I(log(belowX)) * Time))
-#summary(lm(data=data.resp.avs, pct_err ~  belowX * Time))
-summary(lm(data=data.resp.avs, abs_err ~  within_x + Dots_Shown))
-
-summary(lm(data=data.resp.avs, pct_err ~  within_x + Dots_Shown))
-
-summary(lm(data=data.resp.avs, pct_err ~  within_x * Dots_Shown))
-summary(lm(data=data.resp.avs, abs_err ~  within_x_tot * Dots_Shown))
-summary(lm(data=data.resp.avs, pct_err ~  within_x_tot * Dots_Shown))
-summary(lm(data=data.resp.avs, Dots_Counted ~  within_x_tot ))
-
-summary(lm(data=data.resp.avs, Dots_Counted ~  Dots_Shown))
-summary(lm(data=data.resp.avs, Dots_Counted ~  within_x_tot + Dots_Shown))
-summary(lm(data=data.resp.avs, abs_err ~  I(abs(within_x_tot - Dots_Shown))))
-
-#summary(lm(data=data.resp.avs, pct_err ~  within_x + Dots_Shown))
-#summary(lm(data=data.resp.avs, abs_err ~  within_x + Dots_Shown ))
 
 p.0 <- ggplot(data=data.resp.avs, aes(x=factor(Time), y=pct_err)) +
       stat_summary(fun.data="mean_cl_boot", geom="bar", color="gray", alpha=0.7) +
@@ -417,13 +562,16 @@ p.0 <- ggplot(data=data.resp.avs, aes(x=factor(Time), y=pct_err)) +
 
 p.1 <- ggplot(data.resp.avs, aes(x=within_x, y=pct_err)) +
         #geom_point() +
-        geom_point(aes(color=factor(Time))) +
-        stat_smooth(method="lm", aes(color=factor(Time)), se=FALSE, span=1.25) +
+        geom_point(aes(color=factor(Time)), alpha=0.25) +
+        stat_smooth(method="loess", aes(color=factor(Time)), se=FALSE, span=1.25) +
         facet_wrap(~pid, scales="free_y") +
         xlab("P(dots within gaze)") +
         ylab("Abs Percent Error") +
           #xlim(0,0.75) +
-          scale_x_log10() + 
+         # scale_x_log10() + 
+          xlim(0.01,1) +
+          geom_hline(yintercept=0) +
+
          scale_color_discrete(name="Time") +
         theme_light() + 
         paper_theme_3
@@ -437,11 +585,13 @@ p.1 <- ggplot(data.resp.avs, aes(x=within_x, y=pct_err)) +
 p.2 <- ggplot(data.resp.avs, aes(x=within_x, y=pct_err)) +
        # geom_point() +
         stat_summary_bin(bins=6, fun.data="mean_cl_boot") +
-        stat_smooth(method="lm", se=FALSE, span=1.25) +
+        stat_smooth(method="loess", se=FALSE, span=1.25) +
         facet_wrap(~pid, scales="free") +
         xlab("P(dots within gaze)") +
         ylab("Abs Percent Error") +
         #  xlim(0,0.75) + 
+          xlim(0.01,1) +
+
           scale_x_log10() +
       theme_light() + 
       paper_theme_3
@@ -451,15 +601,37 @@ p.2 <- ggplot(data.resp.avs, aes(x=within_x, y=pct_err)) +
 
 
 p.3 <- ggplot(data.resp.avs, aes(x=within_x, y=abs_pct_err)) +
-        geom_point(aes(color=factor(Time)), alpha=0.35, size=2.) +
-        stat_smooth(method="loess", se=FALSE, aes(color=factor(Time)), span=3, size=1.5) +
-        xlab("P(dots within gaze)") +
-        ylab("Absolute percent error") +
-        #xlim(0,0.75) +
-           scale_color_discrete(name="Time") +
-        theme_light() + scale_x_log10() +
-        paper_theme_3 # + xlim(-4,0)
+        geom_point(aes(color=factor(Time)), alpha=0.2, size=2) +
+          stat_smooth(method="lm", se=TRUE,formula=y~poly(x,1),  aes(color=factor(Time)), span=5, size=2.25, alpha=0.2) +
+        stat_smooth(method="lm", se=FALSE,formula=y~poly(x,1),  aes(color=factor(Time)), span=5, size=2.25, alpha=0.8) +
+        xlab("Dots within gaze") +
+        ylab("Absolute error") +
+          xlim(0.001,1) + 
+         geom_hline(yintercept=0) +
 
+           scale_color_discrete(name="Time") +
+        theme_light()  + #ylim(0,100) +
+        paper_theme_3 +
+          scale_y_continuous(labels = scales::percent, limits=c(0,0.85)) +
+         scale_x_continuous(labels = scales::percent)
+
+ p.4 <- ggplot(data.resp.avs, aes(x=within_x, y=pct_err)) +
+        geom_point(aes(color=factor(Time)), alpha=0.2, size=2.) +
+      
+          stat_smooth(method="lm", se=TRUE,formula=y~poly(x,1),  aes(color=factor(Time)), span=5, size=2.25, alpha=0.2) +
+  stat_smooth(method="lm", se=FALSE,formula=y~poly(x,1),  aes(color=factor(Time)), span=5, size=2.25, alpha=0.8) +
+        xlab("Dots within gaze") +
+        ylab("Error") +
+          xlim(0.001,1) +
+           scale_color_discrete(name="Time") +
+           geom_hline(yintercept=0) +
+        theme_light() + 
+        paper_theme_3 +
+          scale_y_continuous(labels = scales::percent, limits=c(-0.7,0.3)) +
+         scale_x_continuous(labels = scales::percent)
+
+
+ 
 p.3.1 <- ggplot(data.resp.avs, aes(x=within_x, y=abs_pct_err)) +
         #geom_point(alpha=0.35, size=2.) +
           stat_summary_bin(fun.data="mean_cl_boot", bins=10 ) +
@@ -470,34 +642,30 @@ p.3.1 <- ggplot(data.resp.avs, aes(x=within_x, y=abs_pct_err)) +
         #xlim(0,0.75) +
            scale_color_discrete(name="Time") +
         theme_light()  +paper_theme_3 +
-        scale_x_log10()
+scale_x_log10(breaks=seq.int(0.0,1,0.2))  
+    
+
 
 p.3.2 <- ggplot(data.resp.avs, aes(x=within_x, y=pct_err)) +
         #geom_point(alpha=0.35, size=2.) +
           stat_summary_bin(fun.data="mean_cl_boot", bins=13 ) +
 
-        stat_smooth(method="loess", se=TRUE,  span=3, size=1.5) +
+        stat_smooth(method="lm", se=TRUE,  span=3, size=1.5) +
         xlab("P(dots within gaze)") +
         ylab("Percent error") +
         #xlim(0,0.75) +
+          xlim(0.01,1) +
+
            scale_color_discrete(name="Time", breaks=seq.int(0,1,0.1)) +
         theme_light()  +paper_theme_3 +
         scale_x_log10()
+
 # ggsave("figs/gaze.pdf", width=5,height=5) 
         
 # ggsave("figs/gaze.png", width=5,height=5)
 
 
- p.4 <- ggplot(data.resp.avs, aes(x=within_x, y=pct_err)) +
-        geom_point(aes(color=factor(Time)), alpha=0.35, size=2.) +
-        stat_smooth(method="loess", se=FALSE, aes(color=factor(Time)), span=3, size=1.5) +
-        xlab("P(dots within gaze)") +
-        ylab("Percent error") +
-        #xlim(0,0.75) +
-           scale_color_discrete(name="Time") +
-        theme_light() + 
-        paper_theme_3 +
-         scale_x_log10()
+
 
 
 data.resp.avs$seen_shown_diff <- data.resp.avs$within_x_tot - data.resp.avs$Dots_Shown
@@ -513,7 +681,7 @@ p.5 <- ggplot(data.resp.avs, aes(x=abs_seen_shown_diff, y=abs_err)) +
 
         xlab("Abs(Seen - Shown)") +
         ylab("Absolute error") +
-        coord_cartesian(ylim=c(0,45)) +
+        #coord_cartesian(ylim=c(0,45)) +
   
            scale_color_discrete(name="Time") +
         theme_light() +    paper_theme_3 
@@ -527,7 +695,7 @@ p.5.1 <- ggplot(data.resp.avs, aes(x=seen_shown_diff, y=err)) +
 
         xlab("Seen - Shown") +
         ylab("Error") +
-        coord_cartesian(ylim=c(-35,5)) +
+       # coord_cartesian(ylim=c(-35,5)) +
            scale_color_discrete(name="Time") +
         theme_light() +  paper_theme_3 
 
@@ -574,19 +742,20 @@ p.6.1 <- ggplot(data.resp.avs, aes(x=Dots_Shown, y=seen_shown_diff, color=factor
 
         xlab("Dots shown") +
         ylab("Seen - Shown") +
-        coord_cartesian(ylim=c(-35,5)) +
+       # coord_cartesian(ylim=c(-35,5)) +
            scale_color_discrete(name="Time") +
         theme_light() +  paper_theme_3  + scale_x_continuous(limits=range(data.resp.avs$Dots_Shown))
   
 
 p.3
+ggsave("figs/abs_err_time_seen.png", width=6,height=5,dpi=400)
+p.4
+ggsave("figs/err_time_seen.png", width=6,height=5,dpi=400)
 p.3.1
 p.3.2
-p.4
 p.5
 p.5.1
 p.5.2
-p.5.3
 p.5.4
 
 p.6
@@ -596,7 +765,6 @@ p.6.1
 
 #p.1
 #p.2
-summary(lm(data=data.resp.avs, Dots_Counted ~ within_x_tot))
 
 #summary(lm(data=data.resp.avs, Dots_Counted ~ seen_shown_diff * within_x_tot))
 
@@ -613,7 +781,7 @@ p.5.3 <- ggplot(data.resp.avs, aes(x=100*within_x_tot/Dots_Shown, y=100*pct_err)
       #geom_point(alpha=0.05) +
       #  stat_smooth(method="loess", se=FALSE,  span=2, size=2.) +
            coord_cartesian(ylim=c(-39,1)) +
-          xlim(54,100) +
+        #  xlim(54,100) +
           #stat_summary_bin(alpha=0.9, size=1, fun.data = "mean_cl_normal",
                             #    binwidth=bw, geom="line") +
          # stat_summary_bin(alpha=0.5, size=1, fun.data = "mean_cl_normal",
@@ -621,8 +789,8 @@ p.5.3 <- ggplot(data.resp.avs, aes(x=100*within_x_tot/Dots_Shown, y=100*pct_err)
           stat_summary_bin(alpha=0.5, size=1, fun.data = "mean_cl_normal", 
           binwidth=bw,aes(width=0.1), geom="errorbar")  +
 
-        xlab("%Seen") +
-        ylab("%Error") +
+        xlab("Percent of dots seen") +
+        ylab("Percent error") +
           # scale_color_discrete(name="Time") +
         theme_light() +  paper_theme_3 
 p.5.3
@@ -636,34 +804,47 @@ subs <- data.resp.avs %>%
         group_by(within_x_bin) %>%
         top_n(n=1, wt=id)
 
-bw <- 3
+bw <- 9
 p.5.3.1 <- ggplot(data=data.resp.avs) +
         stat_smooth(method="lm", aes(x=within_x_tot/Dots_Shown, y=pct_err)) +
         stat_summary(fun.y="mean", geom="point", aes(x=bw*round((within_x_tot)/(bw*Dots_Shown), 2), y=pct_err))  +
         stat_summary(fun.data="mean_se", geom="errorbar", width=0.01,
                       aes(x=bw*round((within_x_tot)/(bw*Dots_Shown), 2), y=pct_err))  +
-          xlab("%Seen") +
-        ylab("%Error") +
-          xlim(0.58, 1.01) +
+          xlab("Dots seen") +
+        ylab("Error") + 
           # scale_color_discrete(name="Time") +
+
+          scale_y_continuous(labels = scales::percent) +
+         # scale_x_continuous(labels = scales::percent, limits=c(0.58,1.01))  +
+           scale_x_continuous(labels = scales::percent, limits=c(-0.01,0.9))  +
+        geom_hline(yintercept=0) +
         theme_light() +  paper_theme_3 
 
 p.5.3.1
+ggsave("figs/seen_by_error.png", width=5, height=5,dpi=400)
+
+bw <- 9
 
 p.5.3.2 <- ggplot(data=data.resp.avs) +
         stat_smooth(method="lm", aes(x=within_x_tot/Dots_Shown, y=abs_pct_err)) +
         stat_summary(fun.y="mean", geom="point", aes(x=bw*round((within_x_tot)/(bw*Dots_Shown), 2), y=abs_pct_err))  +
         stat_summary(fun.data="mean_se", geom="errorbar", width=0.01,
                       aes(x=bw*round((within_x_tot)/(bw*Dots_Shown), 2), y=abs_pct_err))  +
-          xlab("%Seen") +
-        ylab("%Abs(Error)") +
-          xlim(0.58, 1.01) +
-          # scale_color_discrete(name="Time") +
-        theme_light() +  paper_theme_3 
 
+
+          xlab("Dots seen") +
+        ylab("Asolute error") +
+         # scale_x_log10(breaks=seq.int(0.6,1,0.2), labels=scales::percent, limits=c(0.01,1.01)) +
+          #  scale_y_log10(breaks=seq.int(0.0,0.5,0.1), labels=scales::percent) +
+          scale_y_continuous(labels = scales::percent) +
+        #  scale_x_continuous(labels = scales::percent, limits=c(0.58,1.01))  +
+           scale_x_continuous(labels = scales::percent, limits=c(-0.01,0.9))  +
+        geom_hline(yintercept=0) +
+
+          theme_light() +  paper_theme_3  
 p.5.3.2
 
-
+ggsave("figs/seen_by_abs_error.png", width=5, height=5,dpi=400)
 
 
 ```
@@ -672,46 +853,121 @@ p.5.3.2
 ```{r, fig.width=5, fig.height=5}
 
 
-ggplot(data=data.resp.avs, aes(x=within_x_tot/pctArea, y=Dots_Counted)) +
-           geom_point(size=0.5,alpha=0.5) +
-            stat_smooth(method='loess', span=2) +
-            #stat_summary_bin(bins=12, fun.data="mean_cl_boot", color="blue") + paper_theme_2 +
-           ggtitle("Dots seen v. counted") + xlab("(dots seen) / (% area seen)") + ylab("Dots counted") +
-            paper_theme_2  +
-          stat_summary(fun.y="mean", geom="point", aes(x=1000*round((within_x_tot/pctArea)/1000, 2), y=err))  
+bw <- 2000
+ggplot(data=data.resp.avs, aes(x=within_x_tot/(pctArea), y=Dots_Counted)) +
+  
+           
+           #geom_point(size=0.5,alpha=0.5) +
+            #coord_cartesian(ylim=c(8,163), xlim=c(8,163)) +
+            stat_smooth(method='loess') +
+            stat_summary_bin(binwidth=10, fun.y="mean", geom="point") +
+            stat_summary_bin(binwidth=10, fun.data="mean_se", geom="errorbar") +
+           # stat_summary_bin(binwidth=20, fun.y="mean", geom="line", aes(x=Dots_Shown, y=Dots_Counted), color="blue") +
 
-          #  xlim(0,200)
+            #stat_summary_bin(bins=12, fun.data="mean_cl_boot", color="blue") + paper_theme_2 +
+          # ggtitle("Dots seen v. counted") + xlab("(dots seen) / (% area seen)") + ylab("Dots counted") +
+            paper_theme_2  +
+          #stat_summary(fun.y="mean", geom="bar", aes(x=bw*round((within_x_tot/pctArea)/bw, 2), y=err))  +  
+          #stat_summary(fun.data="mean_se", geom="errorbar", aes(x=bw*round((within_x_tot/pctArea)/bw, 2), y=err)) +
+          facet_wrap(~Time) + 
+          xlab("Dots seen / area seen") + ylab("Human estimate") +
+            geom_abline()# + 
+           # xlim(0,175)
+
+
+ggsave("figs/density_by_count.png", width=5,height=5)
+
 
 ggplot(data=data.resp.avs, aes(x=within_x_tot, y=Dots_Counted)) +
-           geom_point(size=0.5,alpha=0.5) +
-            stat_smooth(method='loess', span=5) +
-            ggtitle("Dots seen v. counted") + xlab("Dots seen") + ylab("Dots counted") +
-            paper_theme_2  
+          # geom_point(size=0.5,alpha=0.5) +
+            stat_smooth(method='loess', span=3) +
+           # ggtitle("Dots seen v. counted") + xlab("Dots seen") + ylab("Dots counted") +
+            paper_theme_2  +
+            geom_abline() + 
+           # coord_cartesian(ylim=c(8,78), xlim=c(8,78)) +
+            stat_summary_bin(binwidth=5, fun.y="mean", geom="point") +
+            stat_summary_bin(binwidth=5, fun.data="mean_se", geom="errorbar") +
 
-data.resp.avs$Time_Cond <- as.factor(round(data.resp.avs$Time,2))
+            xlab("Dots seen") +
+
+            ylab("Human estimate") +
+            facet_wrap(~Time)
+
+ggsave("figs/accum_by_count.png", width=5,height=5)
 
 
-ggplot(data=data.resp.avs, aes(x=Time_Cond, y=pctArea)) +
-    geom_jitter(alpha=0.25, width=0.1, height=0.04) + 
-    stat_summary(fun.data="mean_cl_boot", color="red") +
-    xlab("Time") + ylab("Proportion of screen area seen") +
+ggplot(data=data.resp.avs, aes(x=pctArea*100, y=abs_pct_err*100, color=Time)) +
+            #coord_cartesian(ylim=c(8,163), xlim=c(8,163)) +
+            stat_smooth(method='lm', formula=y~x) +
+           #stat_summary_bin(bins=10, fun.y="mean", geom="point") +
+           # stat_summary_bin(bins=10, fun.data="mean_se", geom="errorbar") +
+            paper_theme_2  +
+         # facet_wrap(~Time) + 
+          xlab("Percent of screen area seen") + ylab("Absolute percent error") +
+            geom_hline(yintercept=0)
+ggsave("figs/area_err.png", width=5, height=5)
+#data.resp.avs$Time_Cond <- as.factor(round(as.numeric(as.character(data.resp.avs$Time,2))))
+
+
+ggplot(data=data.resp.avs, aes(x=Time, y=pctArea*100)) +
+    geom_jitter(alpha=0.1, width=0.1, height=0.04) + 
+
+    stat_summary(fun.data="mean_se", color="red") +
+       stat_summary(fun.y="mean", geom="point", color="red") +
+
+       stat_summary(fun.y="mean", geom="line", color="red", aes(x=as.numeric(Time), y=pctArea*100)) +
+
+    xlab("Time") + ylab("Percent of screen area seen") +
    # scale_x_log10()  +
     paper_theme_2
 
-ggplot(data=data.resp.avs, aes(x=within_x_tot/(pctArea), y=within_x_tot, color=Time_Cond)) +
+ggplot(data=data.resp.avs, aes(x=Time, y=within_x * 100)) +
+        geom_jitter(alpha=0.1, size=1.25, width=0.1) +
+        stat_summary(fun.data="mean_se", geom="errorbar", width=0.5) +
+
+       stat_summary(fun.y="mean", geom="point", color="red") +
+       stat_summary(fun.y="mean", geom="line", color="red", aes(x=as.numeric(Time), y=within_x*100)) +
+
+        theme_light() + 
+        paper_theme_3 + 
+        ylab("Percent of dots seen")
+
+ggplot(data=data.resp.avs, aes(x=pctArea, y=within_x,color=Time)) +
+        geom_jitter(alpha=0.3, size=1.25, width=0.01, height=0.01) +
+
+        stat_smooth(method="lm", formula=y~x)  +
+
+        theme_light() + 
+        paper_theme_3 + 
+        ylab("Screen area seen") + xlab("Dots seen") +
+        #  scale_x_log10(breaks=seq.int(0.2,1,0.2)*100) +
+        #    scale_y_log10(breaks=seq.int(0.2,1,0.2)*100)  +
+         # scale_y_continuous(labels = scales::percent) +
+         #  scale_x_continuous(labels = scales::percent)  +
+          scale_x_log10(breaks=seq.int(0.0,1,0.2), labels=scales::percent) +
+            scale_y_log10(breaks=seq.int(0.0,1,0.2), labels=scales::percent) 
+
+ggsave("figs/area_by_seen.png", width=5,height=5)
+
+ggplot(data=data.resp.avs, aes(x=within_x_tot/(pctArea), y=within_x_tot, color=Time)) +
 
            geom_jitter(size=1.0,alpha=0.5, width=2, height=7) +
             geom_abline(alpha=0.9) +
 
-            stat_smooth(method='loess', span=2, size=1.2, se=FALSE) +
+            #stat_smooth(method='loess', span=1, size=1.2, se=FALSE) +
+            stat_smooth(method='glm',formula=y~poly(x,2), size=1.2, se=FALSE) +
+
             ggtitle("(Dots seen) / (% area) v. dots seen") + xlab("Dots seen / (% area seen)") + ylab("Dots seen") +
             paper_theme_2  #+
            # ylim(7,140) + xlim(7,140)
     
+#summary(lm(data=data.resp.avs, within_x ~ log(time_num)))
+
+
     
 #ggplot(data=data.resp.avs, aes(x=))
 
-view(dfSummary(data.resp.avs))
+#view(dfSummary(data.resp.avs))
 
 ```
 
@@ -728,11 +984,11 @@ subs <- data.resp.avs %>%
         mutate(medFix = mean(medFix)) %>%
         mutate(pathLength = mean(pathLength)) %>%
   
-        group_by(pid, Time_Cond) %>%
+        group_by(pid, Time) %>%
         #mutate(abs_pct_err=mean(abs_pct_err)) %>% 
         #mutate(pct_err=mean(pct_err)) %>% 
 
-        #top_n(n=1, wt=id) %>%
+        top_n(n=1, wt=id) %>%
         ungroup %>%
         mutate(Time=factor(round(Time*100)/100))
 
@@ -751,7 +1007,7 @@ ggplot(data=subs, aes(x=log(pathLength), y=abs_pct_err)) +
               xlab("Average path-length (log-scaled)") +
               ylab("Absolute percent error")  
               
-ggplot(data=subs, aes(x=log(medFix+1), y=abs_pct_err)) +
+ggplot(data=subs, aes(x=medFix, y=abs_pct_err)) +
 #ggplot(data=subs, aes(x=medFix, y=abs_pct_err)) + 
               facet_wrap(~Time, scale="free") +
             # stat_summary_bin(fun.data="mean_cl_boot", bins=5) +

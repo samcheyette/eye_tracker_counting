@@ -60,7 +60,8 @@ def get_min_gaze(gaze_points, dot,cutoff=100):
 	min_dist = -1
 	which_gaze = None
 	n_below_x = 0
-	#p_in_gaze = 0
+
+	p_in_gaze = 1.
 	n_continuous_below_x = 0
 	seen_discrete = []
 	n_non_negative = 0
@@ -70,11 +71,13 @@ def get_min_gaze(gaze_points, dot,cutoff=100):
 	path_length = 0
 
 
+	p_func = lambda x: 2.*(1 - 1/(1+np.exp(-0.02*x)))
 
 	for i in xrange(len(gaze_points)):
 		g = gaze_points[i]
 		dist = get_gaze_distance(g, dot)
 		if dist > 0:
+			p_in_gaze *= 1. - p_func(dist)
 
 			if (min_dist == -1 or dist < min_dist):
 				min_dist = dist
@@ -120,9 +123,10 @@ def get_min_gaze(gaze_points, dot,cutoff=100):
 
 	n_looks =  len(seen_discrete) * (n_below_x > 0)
 
+	p_in_gaze = 1. - p_in_gaze
 
 
-	return min_dist, which_gaze, n_below_x, n_looks, med_fix, path_length
+	return min_dist, which_gaze, n_below_x, n_looks, med_fix, path_length, p_in_gaze
 
 
 
@@ -153,6 +157,7 @@ def main(t_d, r_d, o_d, cutoff, dimensions):
 	new_resp_data.at['nLooks'] = None
 	new_resp_data.at['medFix'] = None
 	new_resp_data.at['pathLength'] = None
+	new_resp_data.at['pInGaze'] = None
 
 	left_x = dimensions[0][0]
 	right_x = dimensions[0][1]
@@ -190,6 +195,7 @@ def main(t_d, r_d, o_d, cutoff, dimensions):
 			n_looks = min_gaze[3]
 			med_fix = min_gaze[4]
 			path_length = min_gaze[5]
+			p_in_gaze = min_gaze[6]
 
 			new_resp_data.at[z, 'gazeDist'] = dist
 			new_resp_data.at[z, 'gazeX'] = gaze_x
@@ -200,6 +206,7 @@ def main(t_d, r_d, o_d, cutoff, dimensions):
 			new_resp_data.at[z, 'nLooks'] = n_looks
 			new_resp_data.at[z, 'medFix'] = med_fix
 			new_resp_data.at[z, 'pathLength'] = path_length
+			new_resp_data.at[z, 'pInGaze'] = p_in_gaze
 
 		else:
 			new_resp_data.at[z, 'gazeDist'] = -1
@@ -211,6 +218,7 @@ def main(t_d, r_d, o_d, cutoff, dimensions):
 			new_resp_data.at[z, 'nLooks'] = -1
 			new_resp_data.at[z, 'medFix'] = -1
 			new_resp_data.at[z, 'pathLength'] = -1
+			new_resp_data.at[z, 'pInGaze'] = -1
 
 		if (z > 0 and z % 1000 == 0):
 			time_so_far = time.time() - t0
@@ -229,7 +237,7 @@ def main(t_d, r_d, o_d, cutoff, dimensions):
 
 if __name__ == "__main__":
 	t0 = time.time()
-	dimensions = ((0,2000),(0,1500))
+	dimensions = ((0,1920),(0,1200))
 	n_grid = 10
 
 	cutoff = 500
