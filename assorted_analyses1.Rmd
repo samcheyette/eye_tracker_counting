@@ -1,0 +1,106 @@
+---
+title: "random_analysis.Rmd"
+author: "Sam"
+date: "September 6, 2018"
+output: html_document
+---
+
+
+---
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: yes
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.width=5, fig.height=5,fig.align = "center",cache=TRUE)
+```
+
+
+
+```{r, echo=FALSE, include=FALSE, warning=FALSE, message=FALSE}
+##libraries, globals
+#library(plyr)
+library(ggplot2)
+library(reshape)
+library(grid)
+library(dplyr)
+library(gridExtra)
+library(lme4)
+
+paper_theme <- theme(
+  panel.grid.major = element_blank(), 
+  panel.grid.minor = element_blank(), 
+  panel.background = element_blank(),
+  axis.title.x = element_text(size=18),
+  axis.text.x=element_text(colour="black", 
+                           size = 12), 
+  axis.title.y = element_text(size = 18, vjust = 1),
+  axis.text.y  = element_text(size = 12),
+  axis.line.x = element_line(colour = "black"), 
+  axis.line.y = element_line(colour = "black"),
+  legend.text=element_text(size=16),
+  strip.text=element_blank(),
+          strip.background = element_blank())
+
+paper_theme_2 <- theme_light() + theme(axis.title.x = element_text(size=18),
+  axis.text.x=element_text(colour="black", 
+                           size = 14), 
+  axis.title.y = element_text(size = 18, vjust = 1),
+  axis.text.y  = element_text(size = 14))
+binomial_smooth <- function(...) {
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), ...)
+}
+```
+
+```{r, include=FALSE}
+
+data.resp.loc <- read.csv("data/discrimination_dot_gaze.csv", sep="\t")
+data.tracker <- read.csv("data/discrimination_tracker_data.csv", sep="\t")
+data.tracker$trial_id <- floor((data.tracker$trial_id - 1)/2)
+data.resp.loc$trial_id <- data.resp.loc$trial_id - 1
+
+length(unique(data.tracker$trial_id))
+
+data.resp.loc <- data.resp.loc %>%
+                filter(belowX >= 0)
+trials <- (unique(data.resp.loc$trial_id))
+data.tracker <- data.tracker %>%
+                group_by(trial_id) %>%
+                filter(trial_id %in% trials)
+
+
+data.resp.loc$id <- seq.int(1, nrow(data.resp.loc))
+data.resp.loc$Score <- as.numeric(data.resp.loc$Score) - 1
+
+
+
+data.resp <- data.resp.loc %>%
+            group_by(Trial, Time1, Time2, pid) %>%
+            mutate(cond=paste(round(Time1),round(Time2),sep="_")) %>%
+            top_n(n=1, wt=id)  %>%
+            group_by(Dots_Shown1, Dots_Shown2) %>%
+            mutate(ratio = (Dots_Shown1 - Dots_Shown2)/(Dots_Shown1**2 + Dots_Shown2**2) ** 0.5)  
+
+data.resp$Dots_Counted <- data.resp$Dots_Counted - 1
+head(data.resp)
+
+data.resp.vary <- subset(data.resp, data.resp$Time1 != data.resp$Time2)
+
+
+data.tracker <- data.tracker %>%
+                  filter(ValidityLeft == 0 & ValidityRight == 0) %>%
+
+                mutate(av_x = (GazePointXLeft +GazePointXRight)/2) %>%
+                mutate(av_y = (GazePointYLeft +GazePointYRight)/2) %>%
+                group_by(trial_id) %>%
+                mutate(Time = round(max(TimeStamp)/100)/10)
+
+data.tracker$id <- seq.int(1,nrow(data.tracker))
+
+data.resp.old <- cbind(data.resp)
+```
+
+

@@ -71,13 +71,14 @@ def get_min_gaze(gaze_points, dot,cutoff=100):
 	path_length = 0
 
 
-	p_func = lambda x: 2.*(1 - 1/(1+np.exp(-0.02*x)))
+	#p_func = lambda x: 2.*(1 - 1/(1+np.exp(-0.01*x)))
+	p_func = lambda x: max(2.*(1 - 1/(1+np.exp(-0.01*x))), 1e-3)
 
 	for i in xrange(len(gaze_points)):
 		g = gaze_points[i]
 		dist = get_gaze_distance(g, dot)
 		if dist > 0:
-			p_in_gaze *= 1. - p_func(dist)
+			p_in_gaze *= (1. - p_func(dist))
 
 			if (min_dist == -1 or dist < min_dist):
 				min_dist = dist
@@ -240,14 +241,14 @@ if __name__ == "__main__":
 	dimensions = ((0,1920),(0,1200))
 	n_grid = 10
 
-	cutoff = 500
+	cutoff = 400
 	t_d = "data/estimation_tracker_data.csv"
 	r_d = "data/estimation_response_data.csv"
 	o_d = "data/estimation_dot_gaze.csv"
 	main(t_d, r_d, o_d, cutoff, dimensions)
 	print "Finished Estimation"
-	#t_d = "data/discrimination_tracker_data.csv"
-	#r_d = "data/discrimination_response_data.csv"
-	#o_d = "data/discrimination_dot_gaze.csv"
-	#main(t_d, r_d, o_d, cutoff, dimensions)
-	#print "Finished Discrimination"
+	t_d = "data/discrimination_tracker_data.csv"
+	r_d = "data/discrimination_response_data.csv"
+	o_d = "data/discrimination_dot_gaze.csv"
+	main(t_d, r_d, o_d, cutoff, dimensions)
+	print "Finished Discrimination"

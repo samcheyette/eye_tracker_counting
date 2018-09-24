@@ -24,6 +24,8 @@ library(gridExtra)
 library(lme4)
 library(summarytools)
 library(MuMIn)
+library(stargazer)
+
 paper_theme <- theme(
   panel.grid.major = element_blank(), 
   panel.grid.minor = element_blank(), 
@@ -153,7 +155,7 @@ data.resp.old <- cbind(data.resp)
             
 ```
 
-```{r, fig.width=6, fig.height=5}
+```{r, eval=FALSE, fig.width=6, fig.height=5}
 
 
 
@@ -246,14 +248,15 @@ ggplot(data=data.resp, aes(x=Time, y=100*abs_pct_err)) +
         theme_light() + paper_theme_3 
 ggsave("figs/Time_Abs_Pct_Err.png", width=5, height=4, dpi=400)
 
-ggplot(data=data.resp, aes(x=Time, y=100*pct_err)) +
+ggplot(data=data.resp, aes(x=Time, y=100*pct_err, fill=Time)) +
+     # geom_violin(color="blue", alpha=0.75) +
       stat_summary(geom="bar", alpha=0.8, fun.y="mean") +
-      stat_summary(geom="errorbar", width=0.1,size=1.0, fun.data="mean_se") +
-      stat_summary(geom="point", fun.y="mean") +
+      stat_summary(geom="errorbar", width=0.25,size=1.0, fun.data="mean_se") +
+      stat_summary(geom="point", fun.y="mean", size=3., alpha=0.8) +
 
         xlab("Time (s)") +
         ylab("Percent error") +
-        theme_light() + paper_theme_3 
+        theme_light() + paper_theme_3  + guides(fill=FALSE)
 ggsave("figs/Time_Pct_Err.png", width=5, height=4, dpi=400)
 
 ggplot(data=data.resp) +
@@ -385,7 +388,7 @@ data.resp.old <- cbind(data.resp)
 
 
 
-```{r}
+```{r, eval=FALSE}
 data.resp <- cbind(data.resp.old) %>%
                 group_by(Subject, pid, Time) %>%
               top_n(n=16, wt=id) 
@@ -513,12 +516,19 @@ ggplot(data=data.resp, aes(x=Time, y=weber))  +
                   #mutate(within_x = (gazeDist < 100)*0.65 + (gazeDist < 250) * 0.2 + 0.05) %>%
                  # mutate(within_x = 1 -  0.5**((belowX+.01)*0.5)) %>%
                   #mutate(within_x = (1-(1/(belowX+1.5))**0.5)) %>%
-                  mutate(within_x = 2/(1 + exp(-1 -0.25*belowX)) - 1) %>%
+                  #mutate(within_x = 0.5*(belowX > 0) + 0.5 * (belowX > 4)) %>%
+                  mutate(within_x = pInGaze**0.8) %>%
+
+                  #mutate(within_x = 2/(1 + exp(-1 -0.25*belowX)) - 1) %>%
+
                   group_by(trial_id) %>% 
                   mutate(belowX = mean(belowX)) %>%
-
                   mutate(within_x = mean(within_x)) %>%
-                  mutate(within_x=mean(pInGaze**0.25)) %>%
+
+                  #mutate(within_x = mean(within_x)) %>%
+                  #mutate(within_x=mean(pInGaze)) %>%
+                  #mutate(within_x = belowX) %>%
+
                   mutate(within_x_tot=sum(within_x)) %>%
                   mutate(nLooks = mean(nLooks)) %>%
                   mutate(pathLength = mean(pathLength)) %>%
@@ -532,20 +542,48 @@ ggplot(data=data.resp, aes(x=Time, y=weber))  +
                   #filter(mean_dist < 600) %>%
                   filter(abs_pct_err < 1.0) 
 
+data.resp.avs$seen_shown_diff <- data.resp.avs$within_x_tot - data.resp.avs$Dots_Shown
+data.resp.avs$abs_seen_shown_diff <- abs(data.resp.avs$seen_shown_diff)
+data.resp.avs$seen_shown_rat <- (data.resp.avs$within_x_tot - data.resp.avs$Dots_Shown)/data.resp.avs$Dots_Shown
+data.resp.avs$abs_seen_shown_rat <- abs(data.resp.avs$seen_shown_rat)
+data.resp.avs$time_num <- as.numeric(as.character(data.resp.avs$Time))
+
 ```
 
 ```{r}
 
 
 
-data.resp.avs$time_num <- as.numeric(as.character(data.resp.avs$Time))
-r.1 <- lm(data=data.resp.avs, pct_err ~ time_num)
-r.2 <- lm(data=data.resp.avs, pct_err ~ time_num + within_x)
 
+#r.1 <- lmer(data=data.resp.avs, err ~ time_num + (1+time_num|Subject))
+#r.2 <- lmer(data=data.resp.avs, err ~ time_num + within_x_tot + (1+time_num+within_x_tot|Subject))
+summary(lm(data=data.resp.avs, err ~ seen_shown_diff + Dots_Shown))
+
+r.0 <- lm(data=data.resp.avs, abs_pct_err ~ Dots_Shown)
+r.1 <- lm(data=data.resp.avs, abs_pct_err ~ time_num)
+r.2 <- lm(data=data.resp.avs, abs_pct_err ~ time_num + poly(within_x, 1))
+r.3 <- lm(data=data.resp.avs, abs_pct_err ~ time_num + poly(within_x, 2))
+r.4 <- lm(data=data.resp.avs, abs_pct_err ~ within_x + Dots_Shown)
+r.5 <- lm(data=data.resp.avs, abs_pct_err ~  within_x + time_num + Dots_Shown)
+
+#r.1 <- lm(data=data.resp.avs, Dots_Counted ~ Dots_Shown)
+#r.2 <- lm(data=data.resp.avs, Dots_Counted ~ Dots_Shown + within_x_tot )
+
+#r.1 <- lm(data=data.resp.avs, pct_err ~ time_num)
+#r.2 <- lm(data=data.resp.avs, pct_err ~ time_num + within_x)
+
+summary(r.0)
 summary(r.1)
 summary(r.2)
+summary(r.3)
+summary(r.4)
+summary(r.5)
 
 anova(r.1,r.2)
+
+
+#stargazer(r.2)
+
 ```
 
 ```{r, fig.width=7.5, fig.height=5, results='asis', message=FALSE, echo=FALSE, warning=FALSE}
@@ -615,21 +653,6 @@ p.3 <- ggplot(data.resp.avs, aes(x=within_x, y=abs_pct_err)) +
           scale_y_continuous(labels = scales::percent, limits=c(0,0.85)) +
          scale_x_continuous(labels = scales::percent)
 
- p.4 <- ggplot(data.resp.avs, aes(x=within_x, y=pct_err)) +
-        geom_point(aes(color=factor(Time)), alpha=0.2, size=2.) +
-      
-          stat_smooth(method="lm", se=TRUE,formula=y~poly(x,1),  aes(color=factor(Time)), span=5, size=2.25, alpha=0.2) +
-  stat_smooth(method="lm", se=FALSE,formula=y~poly(x,1),  aes(color=factor(Time)), span=5, size=2.25, alpha=0.8) +
-        xlab("Dots within gaze") +
-        ylab("Error") +
-          xlim(0.001,1) +
-           scale_color_discrete(name="Time") +
-           geom_hline(yintercept=0) +
-        theme_light() + 
-        paper_theme_3 +
-          scale_y_continuous(labels = scales::percent, limits=c(-0.7,0.3)) +
-         scale_x_continuous(labels = scales::percent)
-
 
  
 p.3.1 <- ggplot(data.resp.avs, aes(x=within_x, y=abs_pct_err)) +
@@ -668,10 +691,7 @@ p.3.2 <- ggplot(data.resp.avs, aes(x=within_x, y=pct_err)) +
 
 
 
-data.resp.avs$seen_shown_diff <- data.resp.avs$within_x_tot - data.resp.avs$Dots_Shown
-data.resp.avs$abs_seen_shown_diff <- abs(data.resp.avs$seen_shown_diff)
-data.resp.avs$seen_shown_rat <- (data.resp.avs$within_x_tot - data.resp.avs$Dots_Shown)/data.resp.avs$Dots_Shown
-data.resp.avs$abs_seen_shown_rat <- abs(data.resp.avs$seen_shown_rat)
+
 
 p.5 <- ggplot(data.resp.avs, aes(x=abs_seen_shown_diff, y=abs_err)) +
       #  geom_point(aes(color=factor(Time)), alpha=0.35, size=2.) +
@@ -749,8 +769,29 @@ p.6.1 <- ggplot(data.resp.avs, aes(x=Dots_Shown, y=seen_shown_diff, color=factor
 
 p.3
 ggsave("figs/abs_err_time_seen.png", width=6,height=5,dpi=400)
+
+
+ p.4 <- ggplot(data.resp.avs, aes(x=within_x, y=pct_err, color=factor(Time))) +
+        geom_point(aes(color=factor(Time)), alpha=0.2, size=2.) +
+        #stat_summary_bin(bins=7, alpha=0.5, fun.y="mean", geom="point", size=3.) +
+         # stat_summary_bin(bins=7, alpha=0.5, fun.data="mean_se", geom="errorbar") +
+
+          stat_smooth(method="lm", se=TRUE,formula=y~poly(x,1),  aes(color=factor(Time)), span=5, size=2.25, alpha=0.2) +
+  stat_smooth(method="lm", se=FALSE,formula=y~poly(x,1),  aes(color=factor(Time)), span=5, size=2.25, alpha=0.8) +
+        xlab("Dots within gaze") +
+        ylab("Error") +
+          xlim(0.001,1) +
+           scale_color_discrete(name="Time") +
+           geom_hline(yintercept=0) +
+        theme_light() + 
+        paper_theme_3 +
+          scale_y_continuous(labels = scales::percent, limits=c(-0.7,0.3)) +
+  
+         scale_x_continuous(labels = scales::percent)
+
+ 
 p.4
-ggsave("figs/err_time_seen.png", width=6,height=5,dpi=400)
+ggsave("figs/err_time_seen.png", width=5,height=4,dpi=400)
 p.3.1
 p.3.2
 p.5
@@ -845,6 +886,19 @@ p.5.3.2 <- ggplot(data=data.resp.avs) +
 p.5.3.2
 
 ggsave("figs/seen_by_abs_error.png", width=5, height=5,dpi=400)
+
+p.5.3.3 <- ggplot(data=data.resp.avs, aes(x=Time, y=within_x)) +
+          geom_violin(fill="blue", alpha=0.25, adjust=1.25) + #, draw_quantiles = c(0.25, 0.5, 0.75)) +
+          stat_summary(fun.y="mean", geom="point", size=3., alpha=0.75) +
+          stat_summary(fun.data="mean_cl_boot", geom="errorbar", width=0.25) +
+          scale_y_continuous(labels = scales::percent)  +
+
+          ylab("Dots within gaze") +
+          theme_light() +  paper_theme_3  
+p.5.3.3
+
+ggsave("figs/Time_by_seen.png", width=5, height=4,dpi=400)
+
 
 
 ```
