@@ -99,7 +99,7 @@ data.resp <- data.resp.loc %>%
             mutate(over = 1*(Dots_Counted > Dots_Shown)) %>%
             mutate(under = 1*(Dots_Shown > Dots_Counted)) %>%
             mutate(corr= 1*(Dots_Counted == Dots_Shown)) %>%
-            filter((Dots_Counted < 201) & (abs_pct_err < 1))
+            filter((Dots_Counted < 150) & (abs_pct_err < 1))
 
 
 data.tracker <- data.tracker %>%
@@ -248,16 +248,7 @@ ggplot(data=data.resp, aes(x=Time, y=100*abs_pct_err)) +
         theme_light() + paper_theme_3 
 ggsave("figs/Time_Abs_Pct_Err.png", width=5, height=4, dpi=400)
 
-ggplot(data=data.resp, aes(x=Time, y=100*pct_err, fill=Time)) +
-     # geom_violin(color="blue", alpha=0.75) +
-      stat_summary(geom="bar", alpha=0.8, fun.y="mean") +
-      stat_summary(geom="errorbar", width=0.25,size=1.0, fun.data="mean_se") +
-      stat_summary(geom="point", fun.y="mean", size=3., alpha=0.8) +
 
-        xlab("Time (s)") +
-        ylab("Percent error") +
-        theme_light() + paper_theme_3  + guides(fill=FALSE)
-ggsave("figs/Time_Pct_Err.png", width=5, height=4, dpi=400)
 
 ggplot(data=data.resp) +
       stat_summary(geom="bar", alpha=0.7, fun.y="mean", aes(x=Time, y=pct_err, fill="Total error")) +
@@ -373,7 +364,54 @@ ggplot(data.resp, aes(x=Dots_Shown, y=Dots_Counted)) +
 ggsave("figs/Shown_Count.png", width=8.5, height=4.5, dpi=400)
 
 
-data.resp$time_num <- as.numeric(as.character(data.resp$Time))
+data.resp <- data.resp %>%
+             filter((Dots_Counted < 150) & (abs_pct_err < 1)) %>%
+             group_by(Subject, pid, Time) %>%
+             mutate(time_num=as.numeric(as.character(Time))) %>%
+             mutate(mean_err_subj = mean(pct_err)*(time_num==0.1)) %>%
+             group_by(Subject, pid) %>%  
+             mutate(pos_neg=sign(sum(mean_err_subj))) %>%
+             mutate(mean_err_subj=pos_neg * max(abs(mean_err_subj)))
+                  
+
+ggplot(data=data.resp, aes(x=Time, y=pct_err)) +
+     # geom_violin(color="blue", alpha=0.75) +
+      #stat_summary(geom="bar", alpha=0.8, fun.y="mean") +
+      stat_summary(geom="point", fun.y="mean",position=position_dodge(width=0.2), size=1., alpha=0.8, aes(group=Subject, color="Participant", shape="Participant"))+ 
+     # stat_summary(geom="line", fun.y="median",position=position_dodge(width=0.2), size=.25, alpha=0.5, aes(group=Subject),linetype="dotted")+ 
+        #geom_jitter(width=0.1,height=0.05, size=0.5,alpha=0.25) + 
+        scale_y_continuous(labels = scales::percent) +
+        stat_summary(geom="errorbar", width=0.2,size=1.0, fun.data="mean_se") +
+      stat_summary(geom="point", fun.y="mean", size=3., alpha=0.9, aes(color="Group", shape="Group")) +
+       # coord_cartesian(ylim=c(-.6,.6)) +
+
+        xlab("Time (s)") +
+        ylab("Percent error") +
+        theme_light() + paper_theme_3  + 
+        theme(legend.text=element_text(size=10), legend.title=element_blank()) +
+        guides(fill=FALSE) +
+        scale_color_manual(name="a", values=c("Red", "Black"),labels=c("Group", "Participant")) +
+        scale_shape_manual(name="a", values=c(19, 17), labels=c("Group", "Participant")) +
+
+        geom_hline(yintercept=0)
+ggsave("figs/Time_Pct_Err.png", width=5, height=4, dpi=400)
+
+
+
+ggplot(data=data.resp, aes(x=Time, y= pct_err - mean_err_subj)) +
+     # geom_violin(color="blue", alpha=0.75) +
+      #stat_summary(geom="bar", alpha=0.8, fun.y="mean") +
+      stat_summary(geom="point", fun.y="median",position=position_dodge(width=0.2), size=1., alpha=0.8, aes(group=Subject, color="Participant"), shape=2)+ 
+        #geom_jitter(width=0.1,height=0.05, size=0.5,alpha=0.25) + 
+        scale_y_continuous(labels = scales::percent) +
+        stat_summary(geom="errorbar", width=0.25,size=1.0, fun.data="mean_se") +
+      stat_summary(geom="point", fun.y="mean", size=3., alpha=0.8, aes(color="Group")) +
+        #coord_cartesian(ylim=c(-.6,.6)) +
+
+        xlab("Time (s)") +
+        ylab("Percent error change from 0.1") +
+        theme_light() + paper_theme_3  + guides(fill=FALSE, color=FALSE)
+ggsave("figs/Time_Pct_Err_Subj.png", width=5, height=4, dpi=400)
 
 
 data.resp.old <- cbind(data.resp)
@@ -888,13 +926,16 @@ p.5.3.2
 ggsave("figs/seen_by_abs_error.png", width=5, height=5,dpi=400)
 
 p.5.3.3 <- ggplot(data=data.resp.avs, aes(x=Time, y=within_x)) +
-          geom_violin(fill="blue", alpha=0.25, adjust=1.25) + #, draw_quantiles = c(0.25, 0.5, 0.75)) +
-          stat_summary(fun.y="mean", geom="point", size=3., alpha=0.75) +
-          stat_summary(fun.data="mean_cl_boot", geom="errorbar", width=0.25) +
+          stat_summary(aes(group=Subject, color="Participant", shape="Participant"),alpha=0.7, position=position_jitter(width=0.04,height=0.05), fun.y="median", geom="point") +
+          #geom_violin(fill="blue", alpha=0.25, adjust=1.25) + #, draw_quantiles = c(0.25, 0.5, 0.75)) +
+          stat_summary(fun.y="mean", geom="point", size=4., alpha=0.85, aes(color="Group", shape="Group")) +
+          stat_summary(fun.data="mean_cl_boot", geom="errorbar", width=0.3, size=1) +
           scale_y_continuous(labels = scales::percent)  +
+        scale_color_manual(name="a", values=c("Red", "Black"),labels=c("Group", "Participant")) +
+        scale_shape_manual(name="a", values=c(19, 17), labels=c("Group", "Participant")) +
+          ylab("Dots foveated") +
+          theme_light() +  paper_theme_3  +  theme(legend.title=element_blank(), legend.text=element_text(size=12))
 
-          ylab("Dots within gaze") +
-          theme_light() +  paper_theme_3  
 p.5.3.3
 
 ggsave("figs/Time_by_seen.png", width=5, height=4,dpi=400)
