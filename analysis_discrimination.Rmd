@@ -58,6 +58,10 @@ paper_theme_3 <- theme( axis.title.x = element_text(size=18),
 binomial_smooth <- function(...) {
   geom_smooth(method = "glm", method.args = list(family = "binomial"), ...)
 }
+
+probit_smooth <- function(...) {
+  geom_smooth(method = "glm", method.args = list(family = binomial(link="probit")), ...)
+}
 ```
 
 ```{r, include=FALSE}
@@ -87,8 +91,10 @@ data.resp <- data.resp.loc %>%
             mutate(cond=paste(round(Time1),round(Time2),sep="_")) %>%
             top_n(n=1, wt=id)  %>%
             group_by(Dots_Shown1, Dots_Shown2) %>%
-            mutate(ratio = (Dots_Shown1 - Dots_Shown2)/(Dots_Shown1**2 + Dots_Shown2**2) ** 0.5)  
-
+            mutate(ratio = (Dots_Shown1 - Dots_Shown2)/(Dots_Shown1**2 + Dots_Shown2**2) ** 0.5)  %>%
+            mutate(ratio_2 = max(Dots_Shown1, Dots_Shown2)/min(Dots_Shown1, Dots_Shown2)) %>%
+            mutate(time_num1=as.numeric(as.character(Time1))) %>%
+            mutate(time_num2=as.numeric(as.character(Time2))) 
 data.resp$Dots_Counted <- data.resp$Dots_Counted - 1
 head(data.resp)
 
@@ -105,6 +111,16 @@ data.tracker <- data.tracker %>%
 
 data.tracker$id <- seq.int(1,nrow(data.tracker))
 
+data.resp.cop <- cbind(data.resp)
+
+f_get_weber <- function(whenst) {
+  whomst <- whomst[1]
+  df <- subset(data.resp.cop, as.numeric(as.character(data.resp.cop$pid)) == as.numeric(as.character(whenst)))
+  reg <- glm(data=df, Score ~ ratio_2, family=binomial(link="probit"))
+  return(1/(coef(reg)["Dots_Ratio"]))
+}
+
+
 data.resp.old <- cbind(data.resp)
 ```
 
@@ -112,9 +128,9 @@ data.resp.old <- cbind(data.resp)
 
 
 
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
+```{r, echo=FALSE}
 data.resp <- cbind(data.resp.old)
-
+data.resp$Score <- as.numeric(as.character(data.resp$Score)) - 1
 
 data.resp$cond <- plyr::mapvalues(data.resp$cond, from = c("0_0", "0_1", "1_0", "1_1"), to = c("Short_Short", "Short_Long", "Long_Short", "Long_Long"))
  
@@ -137,11 +153,10 @@ ggplot(data=data.resp, aes(x=cond, y=Score)) +
 #summary(glm(data=data.resp.vary, Dots_Counted ~ ratio + cond, family=binomial(link="probit")))
 
 
-data.resp$Score <- as.numeric(as.character(data.resp$Score))
-data.resp <- data.resp %>%
-           group_by(Subject,cond) %>%
-           mutate(Score = mean(Score)) %>%
-           top_n(n=1, wt=id) 
+#data.resp <- data.resp %>%
+       #    group_by(Subject,cond) %>%
+          # mutate(Score = mean(Score)) %>%
+           #top_n(n=1, wt=id) 
 
 
 ggplot(data=data.resp, aes(x=cond, y=Score)) +
@@ -149,14 +164,88 @@ ggplot(data=data.resp, aes(x=cond, y=Score)) +
         paper_theme +
             xlab("")  + ylab("p(correct)")
 
+
+
+
 ggsave("figs/disc_score.png")
+
+ggplot(data=data.resp, aes(x=abs(ratio), y=Score)) +
+          #stat_summary_bin(bins=10, fun.data="mean_cl_boot") +
+        binomial_smooth() +
+        paper_theme +
+            xlab("")  + ylab("p(correct)")
+
+
+ggplot(data=subset(data.resp, data.resp$Time1 == data.resp$Time2), 
+        aes(x=ratio_2, y=Score, group=cond, color=cond)) +
+          stat_summary_bin(bins=10, fun.data="mean_cl_boot") +
+            binomial_smooth() +
+            theme_light() + paper_theme_3 +
+            xlab("")  + ylab("p(correct)")
+
 
 #summary(glmer(data=data.resp.vary, Dots_Counted ~ ratio + cond + #(1|Subject), family=binomial(link="probit")))
 
 #levels(factor(data.resp$cond))
 #data.resp$cond <-factor(data.resp$cond, levels = levels(factor(data.resp$cond))[c(2,1,3)])
 
-summary(glm(data=data.resp, Dots_Counted ~ ratio + Time1 + Time2,  family=binomial(link="probit")))
+data.resp.novary <- subset(data.resp, data.resp$Time1 == data.resp$Time2)
+data.resp.vary <- subset(data.resp, data.resp$Time1 != data.resp$Time2)
+
+r.1 <- glm(data=data.resp.novary, Dots_Counted ~ ratio * Time1,  family=binomial(link="probit"))
+r.2 <- glm(data=data.resp.vary, Dots_Counted ~ ratio * Time1,  family=binomial(link="probit"))
+r.3 <- glm(data=data.resp, Dots_Counted ~ ratio * Time1 * Time2,  family=binomial(link="probit"))
+
+summary(r.1)
+
+fit_resp <- predict(r.1, data=data.resp.novary, interval="prediction", type="response")
+data.resp.novary$fitted <- fit_resp
+
+ggplot(data=data.resp.novary, aes(x=ratio, y=fitted, color=cond)) +
+            theme_light() + paper_theme_3 +
+      geom_line(size=1.25, alpha=0.9)
+
+fit_resp <- predict(r.2, data=data.resp.vary, interval="prediction", type="response")
+data.resp.vary$fitted <- fit_resp
+
+ggplot(data=data.resp.vary, aes(x=ratio, y=fitted, color=cond)) +
+            theme_light() + paper_theme_3 +
+      geom_line(size=1.25, alpha=0.9)
+
+fit_resp <- predict(r.3, data=data.resp, interval="prediction", type="response")
+data.resp$fitted <- fit_resp
+data.resp <- data.resp %>%
+             mutate(fitted_acc= (1-fitted) *  (Dots_Shown1 > Dots_Shown2) + (fitted) * (Dots_Shown2 > Dots_Shown1))
+
+ggplot(data=data.resp, aes(x=, y=fitted, color=cond)) +
+            theme_light() + paper_theme_3 +
+      geom_line(size=1.25, alpha=0.9)
+
+ggplot(data=data.resp, aes(x=ratio, y=fitted_acc, group=cond, color=cond)) +
+      geom_line() +
+     # geom_point() +
+      geom_vline(xintercept=0, color="white", size=5) +
+       # stat_summary_bin(bins=7, fun.y="mean", geom="line") +
+            theme_light() + paper_theme_2 + xlab("Ratio") + ylab("Accuracy") 
+
+ggplot(data=data.resp, aes(x=ratio, y=fitted_acc, group=cond, color=cond)) +
+     geom_line(size=1.5) +
+      # binomial_smooth(span=2) +
+       # stat_summary_bin(bins=7, fun.y="mean", geom="line") +
+            theme_light() + paper_theme_2 + xlab("Ratio") + ylab("Accuracy") +
+          facet_wrap(~I(ratio>0), scales="free")
+
+
+#ggplot(data=data.resp, 
+        #aes(x=ratio_2, y=Score, group=cond, color=cond)) +
+         # stat_summary_bin(bins=10, fun.data="mean_cl_boot") +
+            #geom_smooth(se=FALSE, method="glm", method.args=list(family=binomial(link="probit")) )+
+#
+            #probit_smooth(se=FALSE) +
+            #theme_light() + paper_theme_3 +
+            #xlab("")  + ylab("p(correct)")
+
+
 
 ```
 
@@ -248,7 +337,7 @@ data.resp.avs.subs <- data.resp.avs.subs %>%
             mutate(dens_norm2 = within_x2/pctArea2) %>%
             mutate(dens_norm = log(dens_norm1) - log(dens_norm2)) %>% 
             mutate(dens_norm_err =dens_norm * (1 * (dens_norm1 < dens_norm2) * (Dots_Shown1 > Dots_Shown2) + 1 * (dens_norm1 > dens_norm2)  * (Dots_Shown1 < Dots_Shown2))) %>% 
-            mutate(dens_norm_err =dens_norm * (1 * (dens_norm1 < dens_norm2) * (Dots_Shown1 > Dots_Shown2) + 1 * (dens_norm1 > dens_norm2)  * (Dots_Shown1 < Dots_Shown2))) %>% 
+
             mutate(acc_err = (within_x1 - within_x2) *  (1 * (within_x1 < within_x2) * (Dots_Shown1 > Dots_Shown2) + 1 *  (within_x1 > within_x2) * (Dots_Shown1 < Dots_Shown2) )) %>% 
             #mutate(dens_norm_abs_err = abs(dens_norm_err)) %>% 
             mutate(acc_err_bin  =  1 * (within_x1 < within_x2) * (Dots_Shown1 > Dots_Shown2) - 1 *  (within_x1 > within_x2) * (Dots_Shown1 < Dots_Shown2)) %>% 
@@ -340,61 +429,45 @@ ggplot(data=data.resp.avs.subs) +
         theme_light() +
         paper_theme_3
 
-
-ggplot(data=data.resp.avs.subs) + 
-            stat_summary(aes(x=factor(dens_norm_err_bin), y=Dots_Counted), 
-                           geom="bar", size=1., alpha=0.5)  +
-          stat_summary(aes(x=factor(dens_norm_err_bin), y=Dots_Counted), 
-                           geom="point", size=2.)  +
-          stat_summary(aes(x=factor(dens_norm_err_bin), y=Dots_Counted), 
-                         geom="errorbar", width=0.25, size=1.)  +
-      scale_x_discrete(labels=c("See 2 > 1, falsely", "Correctly estimate", "See 1 > 2, falsely")) +
-        xlab("") + ylab("P(Choose 2)")  +
-        #facet_wrap(~cond) #+
-        theme_light() +
-        paper_theme_3
-
 data.resp.avs.subs$cond_ord <- factor(data.resp.avs.subs$cond, levels(factor(data.resp.avs.subs$cond))[c(3,2,1,4)])
 
 
-ggplot(data=data.resp.avs.subs, aes(x=cond_ord, y=Dots_Counted)) +
-            geom_hline(yintercept=0.5, alpha=0.5) +
-      stat_summary(geom="point", fun.y="mean",position=position_dodge(width=0.2), size=1., alpha=0.8, aes(group=Subject, color="Participant", shape="Participant"))+ 
+data.resp.avs.subs.2 <- subset(data.resp.avs.subs, as.character(data.resp.avs.subs$cond) == "Long_Short" | as.character(data.resp.avs.subs$cond) == "Short_Long")
   
-        stat_summary(geom="errorbar", width=0.2,size=1.0, fun.data="mean_se", aes(color="Group")) +
-      stat_summary(geom="point", fun.y="mean", size=3., alpha=0.9, aes(color="Group", shape="Group")) +
-         # theme(legend.title=element_blank(), legend.text=element_blank()) +
-
-        scale_color_manual(name="a", values=c("Red", "Black"),labels=c("Group", "Participant")) +
-        scale_shape_manual(name="a", values=c(19, 17), labels=c("Group", "Participant")) +
+  
+ggplot(data=data.resp.avs.subs.2, aes(x=cond_ord, y=Dots_Counted)) +
+          stat_summary(fun.y="mean", geom="point", alpha=0.75, size=2.,position=position_dodge(width=0.2),  aes(color="Participant",shape="Participant", group=Subject)) +
+            stat_summary(fun.y="mean", geom="line", alpha=0.5, size=0.8,position=position_dodge(width=0.2),  aes(color="Participant",shape="Participant", group=Subject)) +
+          stat_summary(fun.y="mean", geom="point", alpha=1, size=5., aes(color="Group", shape="Group")) +
+          stat_summary(fun.data="mean_se", geom="errorbar", width=0.35, aes(color="Group", shape="Group")) +
         theme_light() + 
         paper_theme_3 + 
-        theme(legend.text=element_text(size=10), legend.title=element_blank(), axis.text.x=element_text(size=12), axis.title.y=element_text(size=14), axis.text.y=element_text(size=12)) +
+        geom_hline(yintercept=0.5, alpha=0.5) +
 
+  theme(legend.title=element_blank(), legend.text=element_text(size=12), legend.position=c(0.85,0.85)) +
+  scale_color_manual(name="a", values=c("Red", "Black"),labels=c("Group", "Participant")) +
+        scale_shape_manual(name="a", values=c(19, 17), labels=c("Group", "Participant")) +
             xlab("")  + ylab("p(choose 2)")
 
-ggsave("figs/dots_counted_diff.png", width=6,height=5, dpi=500)
+ggsave("figs/dots_counted_diff.pdf", width=5,height=5)
 
-ggplot(data=data.resp.avs.subs, aes(x=cond_ord, y=within_x_log_diff)) +
+ggplot(data=data.resp.avs.subs.2, aes(x=cond_ord, y=within_x_log_diff)) +
           #geom_violin(adjust=1.5) +
-          #  stat_summary(fun.y="mean", geom="line", alpha=0.75, size=1., linetype="dashed", aes(group=1)) + 
+        geom_hline(yintercept=0.0, alpha=0.5) +
 
-          geom_hline(yintercept=0,alpha=0.5) +
-      stat_summary(geom="point", fun.y="mean",position=position_dodge(width=0.2), size=1., alpha=0.8, aes(group=Subject, color="Participant", shape="Participant"))+ 
-  
-        stat_summary(geom="errorbar", width=0.2,size=1.0, fun.data="mean_se", aes(color="Group")) +
-      stat_summary(geom="point", fun.y="mean", size=3., alpha=0.9, aes(color="Group", shape="Group")) +
-         # theme(legend.title=element_blank(), legend.text=element_blank()) +
-
-        scale_color_manual(name="a", values=c("Red", "Black"),labels=c("Group", "Participant")) +
-        scale_shape_manual(name="a", values=c(19, 17), labels=c("Group", "Participant")) +
+            #stat_summary(fun.y="mean", geom="line", alpha=0.75, size=1., linetype="dashed", aes(group=1)) +
+          stat_summary(fun.y="mean", geom="point", alpha=0.75, size=2.,position=position_dodge(width=0.2),  aes(color="Participant",shape="Participant", group=Subject)) +
+            stat_summary(fun.y="mean", geom="line", alpha=0.5, size=0.8,position=position_dodge(width=0.2),  aes(color="Participant",shape="Participant", group=Subject)) +
+          stat_summary(fun.y="mean", geom="point", alpha=1, size=5., aes(color="Group", shape="Group")) +
+          stat_summary(fun.data="mean_se", geom="errorbar", width=0.35, aes(color="Group", shape="Group")) +
         theme_light() + 
         paper_theme_3 + 
-        theme(legend.text=element_text(size=10), legend.title=element_blank(), axis.text.x=element_text(size=12), axis.title.y=element_text(size=14), axis.text.y=element_text(size=12)) +
+  theme(legend.title=element_blank(), legend.text=element_text(size=12), legend.position=c(0.85,0.85)) +
+  scale_color_manual(name="a", values=c("Red", "Black"),labels=c("Group", "Participant")) +
+        scale_shape_manual(name="a", values=c(19, 17), labels=c("Group", "Participant")) +
+            xlab("")  + ylab(expression(F[2]  -  F[1]))
 
-            xlab("")  + ylab(expression(F[2] - F[1]))
-
-ggsave("figs/dots_seen_diff.png", width=6,height=5, dpi=500)
+ggsave("figs/dots_seen_diff.pdf", width=5,height=5)
 
 
 levels(factor(data.resp.avs.subs$cond_ord))
@@ -402,13 +475,20 @@ levels(factor(data.resp.avs.subs$cond_ord))
 data.resp.avs.subs$cond_ord <- factor(data.resp.avs.subs$cond, levels(factor(data.resp.avs.subs$cond))[c(2,1,3,4)])
 
 
-summary(glm(data=data.resp.avs.subs, Dots_Counted ~ cond_ord, family=binomial(link="probit")))
-summary(glm(data=data.resp.avs.subs, Dots_Counted ~ Dots_Ratio, family=binomial(link="probit")))
-summary(glm(data=data.resp.avs.subs, Dots_Counted ~ cond_ord + Dots_Ratio, family=binomial(link="probit")))
-summary(glm(data=data.resp.avs.subs, Dots_Counted ~ Time1 + Time2 + Dots_Ratio, family=binomial(link="probit")))
-summary(glm(data=data.resp.avs.subs, Dots_Counted ~ Time1 + Time2 + Dots_Ratio + within_x_log_diff, family=binomial(link="probit")))
-summary(glm(data=data.resp.avs.subs, Dots_Counted ~ within_x_log_diff + Dots_Ratio, family=binomial(link="probit")))
-summary(glm(data=data.resp.avs.subs, Dots_Counted ~ within_x_log_diff + Time1 + Time2 + Dots_Ratio, family=binomial(link="probit")))
+
+#summary(glm(data=data.resp.avs.subs, Dots_Counted ~ cond_ord, family=binomial(link="probit")))
+#summary(glm(data=data.resp.avs.subs, Dots_Counted ~ Dots_Ratio, family=binomial(link="probit")))
+#summary(glm(data=data.resp.avs.subs, Dots_Counted ~ #cond_ord + Dots_Ratio, family=binomial(link="probit")))
+
+#summary(glm(data=data.resp.avs.subs, Dots_Counted ~ Time1 + Time2 + Dots_Ratio, family=binomial(link="probit")))
+
+#summary(glm(data=data.resp.avs.subs, Dots_Counted ~ Time1 + Time2 + Dots_Ratio + within_x_log_diff, family=binomial(link="probit")))
+
+
+#summary(glm(data=data.resp.avs.subs, Dots_Counted ~ within_x_log_diff + Dots_Ratio, #family=binomial(link="probit")))
+#summary(glm(data=data.resp.avs.subs, Dots_Counted ~ within_x_log_diff + Time1 + Time2 + Dots_Ratio, family=binomial(link="probit")))
+
+#summary(glmer(data=data.resp.avs.subs, Dots_Counted ~ within_x_log_diff + Time1 + Time2 + (1+.|Dots_Ratio), family=binomial(link="probit")))
 
 
 x1 <- subset(data.resp.avs.subs, data.resp.avs.subs$Time1 == .1 & Time2 == .1)
