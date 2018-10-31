@@ -64,6 +64,7 @@ binomial_smooth <- function(...) {
 }
 
 
+
 ```
 
 
@@ -447,7 +448,43 @@ data.resp.bytime <- data.resp %>%
 table(data.resp.bytime$Time, data.resp.bytime$sd_err)
 #table(data.resp.bypart$sd_err, data.resp.bypart$Time)
 
+
+ggplot(data=data.resp, aes(x=Dots_Shown, y=Dots_Counted)) +
+      stat_summary_bin(bins=35) + geom_abline() +
+      theme_light() + paper_theme_3  +
+      stat_smooth(method="lm", formula=y~x, size=0.8, se=FALSE) +
+      stat_smooth(method="lm", formula=y~x, alpha=0.2, se=TRUE) +
+      theme(axis.title.x=element_text(size=20), axis.title.y=element_text(size=20),axis.text.x=element_text(color="black")) +
+
+      #stat_smooth(method="loess", span=2, size=0.8, se=FALSE) +
+      #stat_smooth(method="loess", span=2, alpha=0.2,size=0, se=TRUE) +
+      xlab("Number") + ylab("Estimate") +
+      coord_cartesian(ylim=c(10,81), xlim=c(10,81))
+    #  xlim(10,81) + ylim(10,81) 
+
+ggsave("figs/estimate_number.png", width=5,height=5,dpi=400)
+ggsave("figs/estimate_number.pdf", width=5,height=5,dpi=400)
+
+
+data.resp.binned <- data.resp %>%
+                    group_by(round(Dots_Shown), Time) %>%
+                    mutate(sd_estimate=sd(Dots_Counted)) %>%
+                    top_n(n=1,wt=id)
+
+ggplot(data=data.resp.binned, aes(x=Dots_Shown, y=sd_estimate)) +
+            stat_summary_bin(bins=25, fun.data="mean_cl_boot") +
+            theme_light() +  paper_theme_3 +
+              stat_smooth(method="lm", formula=y~x, size=0.8, se=FALSE) +
+              stat_smooth(method="lm", formula=y~x, alpha=0.2, se=TRUE) +
+      theme(axis.title.x=element_text(size=20), axis.title.y=element_text(size=20),axis.text.x=element_text(color="black")) +
+
+          xlab("Number") + ylab("Standard deviation of estimates")
+
+ggsave("figs/sd_number.png", width=5,height=5,dpi=400)
+ggsave("figs/sd_number.pdf", width=5,height=5,dpi=400)
+
 data.resp.old <- cbind(data.resp)
+
 
 ```
 
@@ -996,14 +1033,16 @@ p.5.3.3 <- ggplot(data=data.resp.avs, aes(x=Time, y=within_x)) +
           stat_summary(fun.y="mean", geom="point", size=4., alpha=0.85, aes(color="Group", shape="Group")) +
           stat_summary(fun.data="mean_cl_boot", geom="errorbar", width=0.5, size=1, aes(color="Group")) +
           scale_y_continuous(labels = scales::percent)  +
-        scale_color_manual(name="a", values=c("Red", "Black"),labels=c("Group", "Participant")) +
+        scale_color_manual(name="a", values=c("Magenta", "Black"),labels=c("Group", "Participant")) +
         scale_shape_manual(name="a", values=c(19, 17), labels=c("Group", "Participant")) +
           ylab("Dots foveated") +
-          theme_light() +  paper_theme_3  +  theme(legend.title=element_blank(), legend.text=element_text(size=12), legend.position=c(0.2, 0.85))
+          theme_light() +  paper_theme_3  +  theme(legend.title=element_blank(), 
+                                legend.text=element_text(size=12), legend.position=c(0.2, 0.85))
 
 p.5.3.3
 
 ggsave("figs/Time_by_seen.png", width=5, height=5,dpi=400)
+ggsave("figs/Time_by_seen.pdf", width=5, height=5,dpi=400)
 
 
 

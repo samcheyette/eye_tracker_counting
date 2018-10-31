@@ -1,10 +1,3 @@
----
-title: "random_analysis.Rmd"
-author: "Sam"
-date: "September 6, 2018"
-output: html_document
----
-
 
 ---
 output:
@@ -19,16 +12,18 @@ knitr::opts_chunk$set(echo = TRUE,fig.width=5, fig.height=5,fig.align = "center"
 ```
 
 
-
 ```{r, echo=FALSE, include=FALSE, warning=FALSE, message=FALSE}
 ##libraries, globals
-#library(plyr)
+
 library(ggplot2)
 library(reshape)
 library(grid)
 library(dplyr)
 library(gridExtra)
 library(lme4)
+library(summarytools)
+library(MuMIn)
+library(stargazer)
 
 paper_theme <- theme(
   panel.grid.major = element_blank(), 
@@ -36,9 +31,9 @@ paper_theme <- theme(
   panel.background = element_blank(),
   axis.title.x = element_text(size=18),
   axis.text.x=element_text(colour="black", 
-                           size = 12), 
+                           size = 14), 
   axis.title.y = element_text(size = 18, vjust = 1),
-  axis.text.y  = element_text(size = 12),
+  axis.text.y  = element_text(size = 14),
   axis.line.x = element_line(colour = "black"), 
   axis.line.y = element_line(colour = "black"),
   legend.text=element_text(size=16),
@@ -50,57 +45,529 @@ paper_theme_2 <- theme_light() + theme(axis.title.x = element_text(size=18),
                            size = 14), 
   axis.title.y = element_text(size = 18, vjust = 1),
   axis.text.y  = element_text(size = 14))
+
+paper_theme_3 <- theme( axis.title.x = element_text(size=18),
+  axis.text.x=element_text(colour="black", 
+                           size = 14), 
+  axis.title.y = element_text(size = 18, vjust = 1),
+  axis.text.y  = element_text(size = 14),
+  strip.text=element_text(size=16),
+  axis.line.x = element_line(colour = "black"), 
+  axis.line.y = element_line(colour = "black"),
+  legend.title=element_text(size=18),
+  legend.text=element_text(size=16))  
+
+
 binomial_smooth <- function(...) {
   geom_smooth(method = "glm", method.args = list(family = "binomial"), ...)
 }
+
+
 ```
 
-```{r, include=FALSE}
 
-data.resp.loc <- read.csv("data/discrimination_dot_gaze.csv", sep="\t")
-data.tracker <- read.csv("data/discrimination_tracker_data.csv", sep="\t")
-data.tracker$trial_id <- floor((data.tracker$trial_id - 1)/2)
-data.resp.loc$trial_id <- data.resp.loc$trial_id - 1
+```{r, include=FALSE, echo=FALSE, warning=FALSE,message=FALSE}
 
-length(unique(data.tracker$trial_id))
+data.resp.loc <- read.csv("data/estimation_dot_gaze.csv", sep="\t")
+data.tracker <- read.csv("data/estimation_tracker_data.csv", sep="\t")
+data.tracker$trial_id <- data.tracker$trial_id - 1
+data.tracker$id <- seq.int(1,nrow(data.tracker))
+#data.resp.loc$trial_id <- data.resp.loc$trial_id - 1
+
 
 data.resp.loc <- data.resp.loc %>%
                 filter(belowX >= 0)
+
 trials <- (unique(data.resp.loc$trial_id))
+
 data.tracker <- data.tracker %>%
                 group_by(trial_id) %>%
-                filter(trial_id %in% trials)
-
-
-data.resp.loc$id <- seq.int(1, nrow(data.resp.loc))
-data.resp.loc$Score <- as.numeric(data.resp.loc$Score) - 1
-
-
-
-data.resp <- data.resp.loc %>%
-            group_by(Trial, Time1, Time2, pid) %>%
-            mutate(cond=paste(round(Time1),round(Time2),sep="_")) %>%
-            top_n(n=1, wt=id)  %>%
-            group_by(Dots_Shown1, Dots_Shown2) %>%
-            mutate(ratio = (Dots_Shown1 - Dots_Shown2)/(Dots_Shown1**2 + Dots_Shown2**2) ** 0.5)  
-
-data.resp$Dots_Counted <- data.resp$Dots_Counted - 1
-head(data.resp)
-
-data.resp.vary <- subset(data.resp, data.resp$Time1 != data.resp$Time2)
-
-
-data.tracker <- data.tracker %>%
-                  filter(ValidityLeft == 0 & ValidityRight == 0) %>%
+                filter(trial_id %in% trials) %>%
+                filter(ValidityLeft == 0 & ValidityRight == 0) %>%
 
                 mutate(av_x = (GazePointXLeft +GazePointXRight)/2) %>%
                 mutate(av_y = (GazePointYLeft +GazePointYRight)/2) %>%
                 group_by(trial_id) %>%
                 mutate(Time = round(max(TimeStamp)/100)/10)
 
-data.tracker$id <- seq.int(1,nrow(data.tracker))
 
-data.resp.old <- cbind(data.resp)
+data.resp.loc$trial_id <- data.resp.loc$trial_id - 1
+
+data.resp.loc$id <- seq.int(1, nrow(data.resp.loc))
+
+data.resp.loc <- data.resp.loc %>%
+                filter(belowX >= 0) 
+
+
+trials <- (unique(data.resp.loc$trial_id))
+
+
+
+
+data.resp.loc.old <- cbind(data.resp.loc)
+
+
+min(data.resp.loc$dl_x)
+max(data.resp.loc$dl_x)
+
+min(data.resp.loc$dl_y)
+max(data.resp.loc$dl_y)
+
+mean(data.resp.loc$dl_x)
+mean(data.resp.loc$dl_y)
+
+min(data.tracker$GazePoint)
+max(data.tracker$GazePoint)
+
+
+mean(data.tracker$GazePointX)
+mean(data.tracker$GazePoint)
+
+ggplot(data=data.tracker, aes(x=GazePointX)) +
+          geom_histogram(aes(y=..density..))
+
+ggplot(data=data.resp.loc, aes(x=dl_x)) + 
+          geom_density( fill="red", alpha=0.25) +
+        geom_density(data=data.tracker, aes(x=GazePointX), fill="blue", alpha=0.25) 
+
+
+ggplot(data=data.resp.loc, aes(x=dl_y)) + 
+          geom_density( fill="red", alpha=0.25) +
+        geom_density(data=data.tracker, aes(x=GazePoint), fill="blue", alpha=0.25)
+
 ```
 
+```{r}
+
+data.resp <- data.resp.loc %>%
+            mutate(left_x = (dl_x < 865)) %>%
+            mutate(up_y = (dl_y < 538)) %>%
+            group_by(Trial, Time, pid) %>%
+            mutate(sum_x=sum(dl_x*left_x > 0)) %>%
+            mutate(sum_y=sum(dl_y*up_y > 0)) %>%
+            mutate(mean_x=mean(dl_x)) %>%
+            mutate(mean_y=mean(dl_y)) %>%
+            top_n(n=1, wt=id)
+
+f_get_number <- function(unique_id) {
+  unique_id <- unique_id[1]
+  subs <- subset(data.resp, data.resp$trial_id == unique_id)
+  return(subs$Dots_Shown)
+
+}
+f_get_estimate <- function(unique_id) {
+  unique_id <- unique_id[1]
+  subs <- subset(data.resp, data.resp$trial_id == unique_id)
+  return(subs$Dots_Counted)
+
+}
+
+f_get_mean<- function(unique_id, which) {
+  unique_id <- unique_id[1]
+  subs <- subset(data.resp, data.resp$trial_id == unique_id)
+  if (which == "x") {
+      return(subs$mean_x)
+
+  } else {
+    return (subs$mean_y)
+  }
+
+}
+
+
+data.tracker.old <- cbind(data.tracker) %>%
+            group_by(trial_id) %>%
+            mutate(n_shown=f_get_number(trial_id))  %>%
+            mutate(estimate = f_get_estimate(trial_id)) %>%
+            mutate(mean_x=f_get_mean(trial_id, "x")) %>%
+              mutate(mean_y=f_get_mean(trial_id, "y"))
+
+  
+  
+
+ggplot(data=data.resp, aes(x=mean_x, y=mean_y)) +
+  
+    geom_point() +
+     # stat_summary_bin(fun.data="mean_cl_boot", bins=30,  aes(x=mean_x, y=Dots_Counted/Dots_Shown, color="left")) #+ 
+       #   stat_summary_bin(fun.data="mean_cl_boot", bins=30, aes(x=Dots_Shown - sum_x, y=Dots_Counted, color="right"))
+
+       # stat_smooth( aes(x=sum_x, y=Dots_Counted, color="left"), method="lm") +
+       # stat_smooth( aes(x=Dots_Shown - sum_x, y=Dots_Counted, color="right"), method="lm")
+  stat_smooth(method="loess")
+
+ggplot(data=data.resp) +
+        stat_summary_bin(fun.data="mean_cl_boot", bins=30,  aes(x=sum_y, y=Dots_Counted, color="up")) + 
+          stat_summary_bin(fun.data="mean_cl_boot", bins=30, aes(x=Dots_Shown - sum_y, y=Dots_Counted, color="down"))
+
+      #  stat_smooth( aes(x=sum_x, y=Dots_Counted, color="up"), method="lm") +
+      #  stat_smooth( aes(x=Dots_Shown - sum_x, y=Dots_Counted, color="down"), method="lm")
+
+
+data.resp.old <- cbind(data.resp)
+  
+```
+
+```{r}
+data.tracker <- data.tracker.old %>%
+                filter((GazePoint < 1300) & GazePoint > 0) %>%
+                  filter((GazePointX < 2000) & GazePointX > 0) %>%
+
+                mutate(time_num = as.numeric(as.character(Time))) %>%
+                  group_by(trial_id, pid) %>%
+                  
+                 # mutate(Length = TimeStamp / 50) %>%
+                  group_by(Time) %>%
+                  mutate(unique_loc = length(unique(GazePointX))) %>%
+                mutate(n_tot=n())  %>%
+                filter(n_tot > 1000 & time_num != 2.9) %>%
+                    mutate(Length = TimeStamp / 50) %>%
+                filter(!is.na(GazePointX) & !is.na(GazePoint))
+              
+
+
+data.tracker.highernum <- data.tracker%>%
+                  filter(time_num >= 1) 
+                 # filter(TimeStamp > 1500)
+
+#data.tracker.bypart <- data.tracker %>% 
+                    #  group_by(trial_id) %>%
+                    #  mutate(gaze)
+                   
+ggplot(data=data.tracker.highernum, aes(x=GazePointX, y=n_shown)) +
+      stat_summary_bin(bins=20) +
+      #geom_point() +
+        stat_smooth(method="lm")   + 
+        xlim(50,1999) #+
+      #  facet_wrap(~(100*round(TimeStamp/100)))
+       # coord_flip()
+
+ggplot(data=data.tracker.highernum, aes(x=n_shown, y=GazePoint)) +
+      stat_summary_bin(bins=20) +
+      #geom_point() +
+        stat_smooth(method="lm") 
+  
+
+  ggplot(data=data.tracker.highernum, aes(x=TimeStamp, y=GazePointX)) +
+          stat_smooth() +
+          #stat_summary_bin(bins=30) + 
+      xlim(0,3000) #+
+     # facet_wrap(~pid)
+
+ggplot(data=data.tracker, aes(x=TimeStamp, y=-GazePoint)) +
+       # stat_summary_bin(bins=30) +
+          stat_smooth() +
+         xlim(0,3000)  +
+        facet_wrap(~Time)
+
+
+ggplot(data=data.tracker, aes(x=GazePointX, y=-GazePoint, z=TimeStamp)) +
+        stat_summary_hex(bins=20) +
+        scale_fill_gradient2(low="white", mid="blue", high="black", midpoint=1500) +
+        xlim(0,2000) + theme_light() + paper_theme_3 +
+      coord_cartesian(ylim=c(-1100,0))
+        #stat_summary_bin(bins=30) + xlim(0,3000) 
+
+ggplot(data=data.tracker, aes(x=GazePointX, y=-GazePoint, z=TimeStamp)) +
+          stat_summary_hex(bins=12) +
+        scale_fill_gradient2(low="white", mid="blue", high="black", midpoint=0.3) +
+        #scale_fill_gradient2(low="white", mid="blue", high="black", midpoint=0.9) +
+
+      theme_light() + paper_theme_3 
+
+```
+
+
+```{r}
+
+#foveal range
+data.tracker.subs1 <- cbind(data.tracker)
+chunks <- 20
+max_x <- max(data.tracker$GazePointX) + 10
+max_y <- max(data.tracker$GazePoint) + 10
+screen_xs <- seq.int(0,max_x,max_x/chunks)
+screen_ys <- seq.int(0,max_y,max_y/chunks)
+#data.tracker.subs1 <- cbind(data.tracker)
+#data.resp.subs1 <- cbind(data.resp.loc)
+
+#data.resp.loc$TimeStamp <- data.resp.loc$TrialStart
+
+get_data_resp <- function(file_write, write, max_dist) {
+  #dt1 <- cbind(data.tracker)
+  #ds1<- cbind(data.resp.loc)
+ # data.tracker.subs1 <- subset(data.tracker, (data.tracker$pid >0) & (data.tracker$pid < 5) )
+  #data.resp.subs1 <- subset(data.resp.loc,  (data.resp.loc$pid > 0) & (data.resp.loc$pid < 5))
+  
+  subs_min <- 0
+  subs_max <-1
+  times <- unique(data.resp.loc$Time)
+
+  dt1<- subset(data.tracker, (data.tracker$pid >=subs_min) & (data.tracker$pid < subs_max)  &  (data.tracker$Time %in% times))
+  ds1 <- subset(data.resp.loc,  (data.resp.loc$pid >= subs_min) & (data.resp.loc$pid < subs_max)  & (data.resp.loc$Time %in% times))
+
+  
+  f_get_pgaze <- function(dl_x, dl_y, trial, max_dist) {
+              #dl_x, dl_y are individual dot location
+              #trial_id gets equivalent trial in trakcer
+              #so we can extract gp_x, gp_y - vectors of gaze path
+  
+              subs <- subset(dt1, dt1$trial_id == trial)
+              
+              GazePointX <- subs$GazePointX
+              GazePointY <- subs$GazePoint
+
+              dist <- ((GazePointX - dl_x)**2 + (GazePointY-dl_y))**2**0.5
+              within_small <- sum(dist < max_dist*0.5) 
+              within_fovea <- sum(dist < max_dist)
+              within_big <- sum(dist < max_dist*1.5)
+      
+              #get path length
+              front_x <- tail(GazePointX,length(GazePointX)-1)
+              back_x <- head(GazePointX, length(GazePointX)-1)
+              dist_x <- front_x - back_x
+  
+              front_y <- tail(GazePointY,length(GazePointY)-1)
+              back_y <- head(GazePointY, length(GazePointY)-1)
+              dist_y <- front_y - back_y
+              
+              fix_pl <- (dist_x**2 + dist_y**2)**0.5
+              print(c(dist, within_fovea))
+  
+  
+              return(c(within_fovea,within_small,within_big, sum(fix_pl), mean(dist)))
+  }
+  
+f_get_area <- function(trial, max_dist) {
+
+    subs <- subset(dt1, dt1$trial_id == trial)
+    gp_x <- subs$GazePointX
+    gp_y <- subs$GazePoint
+    area_count = c()
+    for (i in 1:length(screen_xs)) {
+        for (j in 1:length(screen_ys)) {
+            x1 <- screen_xs[i]
+            y1 <- screen_ys[i]
+            
+            dist <- ((x1 - gp_x)**2 + (y1-gp_y)**2)**0.5
+            within_x <- sum(dist < max_dist)
+            area_count[length(area_count) + 1] <- (within_x > 0)*1
+
+        }
+    }
+    return(mean(area_count))
+
+}
+  
+  #f_get_pgaze(1000,500,272,500)
+  
+  
+    all_x <- ds1$dl_x
+    all_y <- ds1$dl_y
+    all_trials <- ds1$trial_id
+    tbl_trials <- table(all_trials)
+    unique_trials <- unique(all_trials)
+    
+    foveal <- c()
+    small <- c()
+    big <- c()
+    dist <- c()
+    dist_var <- c()
+    areas <- c()
+    
+    reps <- c()
+    ptm <- proc.time()
+    for (i in 1:length(unique_trials)) {
+      trial_num <- unique_trials[i]
+      n_rep <- sum((all_trials==trial_num)*1)
+      reps[i] <- n_rep
+      area <- f_get_area(trial_num, max_dist)
+      areas  <- append(areas, rep(area, times=n_rep))
+      
+    }
+    t1 <- proc.time()
+    print(paste("area complete, t=",round(t1-ptm, 2), sep=""))
+    
+    for (i in 1:nrow(ds1)) {
+      dl_x <- all_x[i]
+      dl_y <- all_y[i]
+      trial <- all_trials[i]
+      gaze_data <- f_get_pgaze(dl_x, dl_y, trial, max_dist)
+      foveal[i] <- gaze_data[1]
+      small[i] <- gaze_data[2]
+      big[i] <- gaze_data[3]
+      dist[i] <- gaze_data[4]
+      dist_var[i] <- gaze_data[5]
+
+
+      if (i%%2500 == 0) {
+        rows <- nrow(ds1)
+        rem <- rows - i
+        t <- proc.time() - t1
+        print(c(i, round(t,2), round(t/(rem+1), 2)))
+      }
+      #print(c(trial, dl_x, dl_y, gaze_data[1],gaze_data[2], gaze_data[3], gaze_data[4], gaze_data[5]))
+      
+    } 
+    
+  
+  t2 <-proc.time()
+
+  print(paste("foveal complete, t=",round(t2-t1),sep=""))
+  print(paste("total t=",round(t2-ptm,2), sep=""))
+
+  ds1$p_foveal <- foveal
+  ds1$p_small <- small
+  ds1$p_big <- big
+  ds1$fix_PL <- dist
+  ds1$fix_var <- dist_var
+  ds1$area <- areas
+  
+  return(ds1)
+
+}
+
+  
+get_data_resp_wrapper <- function(file_read, file_write, read, write, path, max_dist) {
+  
+
+if (file_read %in% list.files(path) & read) {
+    path_file_read <- paste(path, file_read, sep="/")
+   data.resp.subs1 <- read.csv(path_file_read)
+} else {
+      data.resp.subs1 <- get_data_resp(file_write, write, max_dist) 
+
+      if (write == TRUE) {
+         path_file_write <- paste(path, file_write, sep="/")
+
+         write.csv(data.resp.subs1, file=path_file_write, row.names=FALSE)
+        }
+  }
+  return(data.resp.subs1)
+}
+
+
+#for (max_dist in c(100,700,300)){
+max_dist <- 200
+path <- "r_data"
+file_write <- paste(paste("r_resp", max_dist, sep="_"),"csv", sep=".")
+file_read <- paste(paste("r_resp", max_dist, sep="_"),"csv", sep=".")
+read = FALSE
+write = TRUE
+data.resp.subs1 <-get_data_resp_wrapper(file_read, file_write, read, write, path, max_dist)
+  
+#}
+
+
+```
+
+
+
+```{r}
+
+p.1 <- ggplot(data=data.resp.subs1, aes(x=dl_x, y=dl_y)) +
+
+      geom_point(size=0.3, alpha=0.5) +
+      geom_point(data=data.tracker.subs1, aes(x=GazePointX, y=GazePoint, color=TimeStamp), size=2, alpha=0.5) +
+      facet_wrap(~trial_id) +
+    
+      paper_theme_2
+
+
+#ggsave("figs/eye_track.pdf")
+#data.resp <- data.resp.subs1 %>%
+         #    group_by(trial_id) %>%
+            # mutate()
+
+#print(p.1)
+
+
+p.2 <- ggplot(data=data.resp.subs1, aes(x=dl_x, y=dl_y, color=p_gaze)) +
+
+      geom_point(size=1, alpha=0.5) +
+      geom_point(data=data.tracker.subs1, aes(x=GazePointX, y=GazePoint), size=0.3, alpha=0.5, inherit.aes=FALSE) +
+      facet_wrap(~trial_id) +
+    
+      paper_theme_2
+
+
+#print(p.2)
+#ggsave("figs/eye_track.pdf")
+
+typeof(data.resp.subs1$trial_id)
+min_close <- 3
+data.resp <- data.resp.subs1 %>%
+            mutate(Time = as.factor(round(Time, 2))) %>%
+             mutate(Subject=as.factor(Subject)) %>%
+        
+             group_by(Subject,trial_id) %>%
+             mutate(mean_dist = mean(p_foveal)) %>%
+             mutate(n_in_fovea = (p_small > min_close)*1 )%>%
+             mutate(n_within_gaze = sum(n_in_fovea)) %>%
+             mutate(p_within_gaze = n_within_gaze/Dots_Shown) %>%
+            mutate(time_num = as.numeric(as.character(Time))) %>%
+            mutate(err=Dots_Counted-Dots_Shown) %>%
+              mutate(pct_err=err/Dots_Shown) %>%
+            mutate(abs_pct_err=abs(pct_err)) %>%
+             top_n(n=1, wt=id) %>%
+           # filter((p_within_gaze>0.001) & (pct_err < 2)) %>%
+              group_by(Subject) %>%
+            mutate(mean_fix_PL = mean(fix_PL))
+
+data.resp.subject <- data.resp %>%
+            ungroup %>%
+            group_by(Subject) %>%
+          mutate(mean_dist=mean(mean_dist)) %>%
+
+            #mutate(fix_PL=mean(fix_PL)) %>%
+            mutate(area=mean(area/Dots_Shown)) %>%
+            group_by(Subject, Time) %>%
+            mutate(fix_PL=mean(fix_PL)) %>%
+          mutate(abs_pct_err=mean(abs_pct_err)) %>%
+          mutate(pct_err=mean(pct_err)) %>%
+          mutate(Dots_Shown = mean(Dots_Shown)) %>%
+            #summarise_all(funs(mean)) %>% 
+            top_n(n=1, wt=id)
+
+
+ggplot(data=data.resp, aes(x=p_within_gaze, y=pct_err, color=Time)) +
+      geom_point(size=0.5, alpha=0.5) +
+      stat_smooth(method="lm") +   
+      geom_hline(yintercept=0) +
+      paper_theme
+
+
+ggplot(data=data.resp, aes(x=area, y=abs_pct_err, color=Time)) +
+      geom_point(size=0.5, alpha=0.5) +
+      stat_smooth(method="lm") +   
+      geom_hline(yintercept=0) +
+      paper_theme
+
+ggplot(data=data.resp.subject, aes(x=mean_dist, y=abs_pct_err, color=Time)) +
+      geom_point(size=0.5, alpha=0.5) +
+      stat_smooth(method="lm") +   
+      geom_hline(yintercept=0) +
+      paper_theme
+          
+          
+
+ggplot(data=data.resp, aes(x=mean_dist, y=abs_pct_err, color=Time)) +
+      geom_point() +
+      stat_smooth(method="loess") +
+      geom_hline(yintercept=0) +
+      paper_theme 
+
+
+
+ggplot(data=data.resp.subject, aes(x=p_within_gaze, y=area, color=Time)) +
+      #stat_summary_bin(bins=30, fun.y="mean", geom="point") +
+      geom_point() +
+      stat_smooth(method="lm") +
+      geom_hline(yintercept=0) +
+      paper_theme 
+
+
+summary(lm(data=data.resp.subject, abs_pct_err~fix_PL + time_num))
+summary(lm(data=data.resp.subject, pct_err~fix_PL + time_num))
+summary(lm(data=data.resp.subject, abs_pct_err~I(fix_PL/time_num) + Dots_Shown))
+
+```
 
