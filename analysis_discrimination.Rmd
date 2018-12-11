@@ -301,10 +301,10 @@ ggplot(data=data.resp, aes(x=Dots_Shown1/Dots_Shown2, y=1-Dots_Counted)) +
 ggsave("figs/counted.pdf", width=5,height=5,dpi=400)
 
 
-ggplot(data=data.resp, aes(x=Dots_Shown2/(Dots_Shown2, y=Dots_Counted)) +
+ggplot(data=data.resp, aes(x=Dots_Shown2/Dots_Shown1, y=Dots_Counted)) +
         stat_summary_bin(fun.data="mean_se", bins=11) +
               theme_light() + paper_theme_3 +   
-               theme(legend.text=element_text(size=12), 
+               theme(legend.text=element_text(size=14), axis.text=element_text(size=16),axis.title=element_text(size=20),
                      legend.position=c(0.85,0.8), legend.title=element_blank()) +
              # probit_smooth(color="black", se=FALSE)+
              # probit_smooth(color="black", se=TRUE, alpha=0.3)+
@@ -312,16 +312,16 @@ ggplot(data=data.resp, aes(x=Dots_Shown2/(Dots_Shown2, y=Dots_Counted)) +
               probit_smooth(se=TRUE, alpha=0.3)+
               scale_color_manual(values=c("blue", "red")) +
               ylab("p(choose 2)") + #xlab("Numerical Ratio") +
-              xlab(expression(paste("Numerical ratio  ", (N[1] / N[2])))) +
-             ylim(0,1)# +
+              xlab(expression(paste("Numerical ratio  ", (N[2] / N[1])))) +
+             ylim(0,1) + geom_hline(yintercept=0.5, linetype="dotted", size=1.5)
             #facet_wrap(~I(Time1==Time2))
 
-ggsave("figs/counted.pdf", width=5,height=5,dpi=400)
+ggsave("figs/counted.pdf", width=5,height=4.5,dpi=400)
 
 
 
 
-ggplot(data=data.resp.vary, aes(x=Dots_Shown2/(Dots_Shown1 + Dots_Shown2), y=Dots_Counted, color=cond)) +
+ggplot(data=data.resp.vary, aes(x=Dots_Shown2/Dots_Shown1, y=Dots_Counted, color=cond)) +
   
         stat_summary_bin(fun.data="mean_se", bins=11, alpha=0.8, position=position_dodge(width=0.0)) +
        # stat_summary_bin(fun.y="mean", bins=9, geom="point") +
@@ -330,14 +330,14 @@ ggplot(data=data.resp.vary, aes(x=Dots_Shown2/(Dots_Shown1 + Dots_Shown2), y=Dot
 
       # geom_jitter(width=0.01,height=0.01,alpha=0.9, size=1, shape=1) +
               theme_light() + paper_theme_3 +   
-               theme(legend.text=element_text(size=16), 
-                     legend.position=c(0.2,0.85), 
-                     legend.title=element_blank()) +
+                 theme(legend.text=element_text(size=16), axis.text=element_text(size=16),axis.title=element_text(size=20),
+                     legend.position=c(0.2,0.8), legend.title=element_blank()) +
               probit_smooth(aes(y=Dots_Counted), se=FALSE)+
               probit_smooth(aes(y=Dots_Counted),se=TRUE, alpha=0.3)+
               scale_color_manual(values=c("blue4", "green4")) +
               ylab("p(choose 2)") + #xlab("Numerical Ratio") +
-              xlab(expression(paste("Numerical ratio ", (N[1] / N[2])))) +
+              xlab(expression(paste("Numerical ratio ", (N[2] / N[1])))) +
+            geom_hline(yintercept=0.5, size=1.5, linetype="dotted")
             # ylim(0,1) + 
            # xlim(0,1.55) +
            # coord_cartesian(xlim=c(0.63,1.61), ylim=c(0,1))
@@ -346,14 +346,56 @@ ggplot(data=data.resp.vary, aes(x=Dots_Shown2/(Dots_Shown1 + Dots_Shown2), y=Dot
 
 ggsave("figs/sl_ls.pdf", width=5, height=4.5,dpi=400)
 
+ggplot(data=data.resp.novary, aes(x=Dots_Shown2/Dots_Shown1, y=Dots_Counted, color=cond)) +
+  
+        stat_summary_bin(fun.data="mean_se", bins=11, alpha=0.8, position=position_dodge(width=0.0)) +
+       # stat_summary_bin(fun.y="mean", bins=9, geom="point") +
+      #  geom_point(data=data.resp.binned.vary, aes(x=ratio3, y=0, color=mean_rat), size=5) +
+      #  geom_point(data=data.resp.binned.vary, aes(x=ratio3, y=1, color=1-mean_rat),size=5) +
+
+      # geom_jitter(width=0.01,height=0.01,alpha=0.9, size=1, shape=1) +
+              theme_light() + paper_theme_3 +   
+                 theme(legend.text=element_text(size=16), axis.text=element_text(size=16),axis.title=element_text(size=20),
+                     legend.position=c(0.2,0.8), legend.title=element_blank()) +
+              probit_smooth(aes(y=Dots_Counted), se=FALSE)+
+              probit_smooth(aes(y=Dots_Counted),se=TRUE, alpha=0.3)+
+              scale_color_manual(values=c("blue4", "green4")) +
+              ylab("p(choose 2)") + #xlab("Numerical Ratio") +
+              xlab(expression(paste("Numerical ratio ", (N[2] / N[1])))) +
+              geom_hline(yintercept=0.5, size=1.5, linetype="dotted")
+
+            # ylim(0,1) + 
+           # xlim(0,1.55) +
+           # coord_cartesian(xlim=c(0.63,1.61), ylim=c(0,1))
+          #xlim(0.61,1.57)
+            #facet_wrap(~I(Time1==Time2))
+
+ggsave("figs/ss_ll.pdf", width=5, height=4.5,dpi=400)
+
+
+ggplot(data=data.resp.novary, aes(x=ratio_2, y=Score)) +
+        stat_summary_bin(fun.data="mean_se", bins=8) +
+              theme_light() + paper_theme_3 +   
+                 theme(legend.text=element_text(size=16), axis.text=element_text(size=16),axis.title=element_text(size=20),
+                     legend.position=c(0.8,0.85), legend.title=element_blank()) +
+
+              probit_smooth(se=FALSE)+
+              probit_smooth(se=TRUE, alpha=0.3)+
+              scale_color_manual(values=c("yellow3", "magenta4")) +
+
+              ylab("Accuracy") + 
+              xlab("Absolute Ratio (Min/Max)") +
+            geom_hline(yintercept=0.5, linetype="dotted", size=1.5) +
+
+             ylim(0,1) #+ coord_cartesian(xlim=c(0.6,1.0))
+ggsave("figs/disc_score.pdf", width=5, height=4.5)
 
 
 ggplot(data=data.resp.novary, aes(x=ratio_2, y=Score, group=cond, color=cond)) +
         stat_summary_bin(fun.data="mean_se", bins=8) +
               theme_light() + paper_theme_3 +   
-              theme(legend.text=element_text(size=16), 
-                     legend.position=c(0.82,0.85), 
-                     legend.title=element_blank()) +
+                 theme(legend.text=element_text(size=16), axis.text=element_text(size=16),axis.title=element_text(size=20),
+                     legend.position=c(0.8,0.85), legend.title=element_blank()) +
 
               probit_smooth(se=FALSE)+
               probit_smooth(se=TRUE, alpha=0.3, level=0.78)+
@@ -361,6 +403,7 @@ ggplot(data=data.resp.novary, aes(x=ratio_2, y=Score, group=cond, color=cond)) +
 
               ylab("Accuracy") + 
               xlab("Absolute Ratio (Min/Max)") +
+            geom_hline(yintercept=0.5, linetype="dotted", size=1.5) +
              ylim(0,1) #+ coord_cartesian(xlim=c(0.6,1.0))
         
 ggsave("figs/ss_ll.pdf", width=5,height=4.5,dpi=400)
@@ -716,4 +759,14 @@ ggplot(subs, aes(x=log_fix, y=weber)) +
 summary(glm(data=subs, Score ~ log_PL, family=binomial(link="probit")))
         
 
+```
+
+
+
+```{r}
+
+df <- data.frame(a=c("x","y","z"), b=c(1,2,3), c=c(4,5,6))
+df <- melt(df, id=c("a"))
+
+grepl("ab","a")
 ```
